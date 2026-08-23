@@ -38,7 +38,7 @@ T4.6 mixed-granularity paging took the next 42%. Safe vs fast is
 still a large factor. T4.8c fills the Linux row: on RISC-V under
 QEMU TCG software emulation, same host, trimmed Linux takes 5.1×
 fast-boot's E0→E4 and stock 17.8×
-([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
+([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
 The honest E0→E4 number counts QEMU startup, guest boot wait, and
 sub-ms delivery once each (D-0070/D-0071); E3w→E4 is retired.
 
@@ -220,8 +220,10 @@ open — see Results.
 Exhibit tables: [phase decomposition](exhibits/phase-decomposition.md)
 (D-0064 centerpiece columns), [edges](exhibits/edges.md),
 [dump placement](exhibits/dump-placement.md),
-[cross-system](exhibits/cross-system.md) (T4.8), its successors
-[T4.8b](exhibits/cross-system-t48b.md) and the current
+[cross-system-current](exhibits/cross-system-current.md) (the
+current comparison), the frozen campaign exhibits
+[cross-system](exhibits/cross-system.md) (T4.8),
+[T4.8b](exhibits/cross-system-t48b.md), and
 [T4.8c](exhibits/cross-system-t48c.md),
 [T4.7 firmware](exhibits/t47-firmware.md), and the
 [regime witness](exhibits/regime-witness.md).
@@ -509,7 +511,7 @@ mitigation did what it was registered to do.
 On RISC-V under QEMU TCG software emulation, same host, same QEMU,
 `release-fast-boot` reaches first HTTP byte 5.1× faster than
 trimmed Linux and 17.8× faster than stock
-([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
+([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
 Published unikernel figures (2–3 ms) and Firecracker's ~125 ms
 Linux boot are x86 with KVM hardware virtualization, where
 absolute times run roughly 5–10× lower. Those absolute numbers are
@@ -647,7 +649,7 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
    appendix [appendix-regenerate.md](appendix-regenerate.md).
 8. **Linux-tuning fairness** (D-0062) — measured: trimmed beats
    stock by 659.96 ms
-   ([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)),
+   ([exhibits/cross-system-current.md](exhibits/cross-system-current.md)),
    so the trim removed real work. Config published:
    `bench/linux/linux-trimmed.fragment`. A Linux boot-time
    specialist could likely do better; we claim *a* minimal Linux,
@@ -892,8 +894,9 @@ exhibit stays the before.
 - [Dump placement exhibit](exhibits/dump-placement.md)
 - [Cross-system exhibit](exhibits/cross-system.md)
 - [Cross-system T4.8b exhibit](exhibits/cross-system-t48b.md)
-- [Cross-system T4.8c exhibit](exhibits/cross-system-t48c.md) —
-  the current comparison
+- [Cross-system T4.8c exhibit](exhibits/cross-system-t48c.md)
+- [Current comparison](exhibits/cross-system-current.md) — alias
+  following `CURRENT_COMPARISON`; campaign exhibits stay frozen
 - [T4.7 firmware-removal exhibit](exhibits/t47-firmware.md)
 - [Regime-witness exhibit](exhibits/regime-witness.md)
 - [Linux boot decomposition](exhibits/linux-decomposition.md)
