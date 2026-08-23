@@ -14,6 +14,9 @@ pins do not follow it. The T4.8b table comes from its own CSV pin
 (`t48b`, D-0073 after) with T4.8 frozen as the before. The T4.8c
 table comes from `t48c` (D-0081) with T4.8b frozen as the before.
 The T4.7 firmware exhibit comes from the t47c CSV pin (`c2759e2`).
+`cross-system-current.md` is an alias for whichever campaign
+CURRENT_COMPARISON names: the report's prose cites it wherever it
+means "the comparison"; per-campaign exhibits stay frozen.
 The working-tree files are not read — a local `just bench` leftover
 cannot become an exhibit.
 
@@ -86,6 +89,23 @@ D0081_DELTA_HI_NS = -16_000_000
 # D-0078 / regime-witness cluster divide on page_verify. Classifies
 # a generated canary; it is not a campaign number.
 D0078_CANARY_DIVIDE_NS = 14_000_000
+# The current comparison. The report's prose cites
+# cross-system-current.md wherever it means "the comparison"; a
+# specific campaign's exhibit is cited only where that campaign is
+# discussed as history. Advancing a campaign = append its entry
+# (label, rev, batches, sha_prefix, n_per_arm, exhibit file) to
+# COMPARISON_LINEAGE and move CURRENT_COMPARISON to its label; the
+# alias regenerates from the new pin or fails closed — it cannot
+# silently serve a stale or half-populated table.
+COMPARISON_LINEAGE = (
+    ("T4.8", T48_REV, T48_BATCHES, T48_SHA_PREFIX, T48_N_PER_ARM,
+     "cross-system.md"),
+    ("T4.8b", T48B_REV, T48B_BATCHES, T48B_SHA_PREFIX, T48B_N_PER_ARM,
+     "cross-system-t48b.md"),
+    ("T4.8c", T48C_REV, T48C_BATCHES, T48C_SHA_PREFIX, T48C_N_PER_ARM,
+     "cross-system-t48c.md"),
+)
+CURRENT_COMPARISON = "T4.8c"
 # T4.7 confirmation CSV commit (D-0079). Measured kernel is git_sha
 # 346f4c1 (not this object). Four Whimbrel arms, two firmware lanes,
 # one batch set. Working-tree CSVs are not read.
@@ -1928,6 +1948,144 @@ def write_cross_system_t48c(
             f"{fmt_ns(t48b_e2)} (Δ {fmt_delta(t48c_e2 - t48b_e2)}). "
             "The whimbrel arms carry no D-0081 change, and "
             "fast-boot's window has no serial exposure (D-0078).",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def current_comparison_entry(
+    lineage: tuple = COMPARISON_LINEAGE,
+    current: str = CURRENT_COMPARISON,
+) -> tuple:
+    """Resolve CURRENT_COMPARISON against COMPARISON_LINEAGE.
+
+    The current campaign must be the lineage tail: pointing the
+    alias at frozen history is a wiring error, not a request.
+    """
+    labels = [e[0] for e in lineage]
+    if current not in labels:
+        raise ExhibitFail(
+            f"TEST FAIL: CURRENT_COMPARISON {current!r} not in "
+            f"lineage {labels}"
+        )
+    if current != labels[-1]:
+        raise ExhibitFail(
+            f"TEST FAIL: CURRENT_COMPARISON {current!r} is not the "
+            f"lineage tail {labels[-1]!r}"
+        )
+    return lineage[-1]
+
+
+def write_cross_system_current(cur_rec: list[dict], *, entry: tuple) -> str:
+    """The current-comparison alias (cross-system-current.md).
+
+    Lineage header plus the current E0→E4 table and ratios, computed
+    from the pin CURRENT_COMPARISON names. The shape checks here are
+    deliberately independent of the per-campaign validators: if the
+    constant is advanced to a pin whose CSVs are missing or whose
+    batch set / arm counts do not match the lineage entry, this
+    writer fails closed instead of serving an empty or
+    half-populated table.
+    """
+    label, rev, batches, sha_prefix, n_per_arm, exhibit = entry
+    got_batches = {r["batch_id"] for r in cur_rec}
+    if got_batches != set(batches):
+        raise ExhibitFail(
+            f"TEST FAIL: current comparison {label} batch_id set "
+            f"{sorted(got_batches)} does not match the lineage entry "
+            f"{sorted(batches)}"
+        )
+    shas = {r["git_sha"] for r in cur_rec}
+    if len(shas) != 1:
+        raise ExhibitFail(
+            f"TEST FAIL: current comparison {label} mixed git_sha "
+            f"{sorted(shas)}"
+        )
+    sha = next(iter(shas))
+    if not sha.startswith(sha_prefix):
+        raise ExhibitFail(
+            f"TEST FAIL: current comparison {label} git_sha {sha} "
+            f"does not start with {sha_prefix}"
+        )
+    for field in ("e0_to_e4_ns", "d_fin_ns"):
+        if any(field not in r for r in cur_rec):
+            raise ExhibitFail(
+                f"TEST FAIL: current comparison {label} runs.csv "
+                f"missing {field}"
+            )
+    for _sys, cfg in T48_ARM_ORDER:
+        rows = [r for r in cur_rec if r["config"] == cfg]
+        if len(rows) != n_per_arm:
+            raise ExhibitFail(
+                f"TEST FAIL: current comparison {label} {cfg} has "
+                f"{len(rows)} recorded trials, want {n_per_arm}"
+            )
+    e4 = {
+        cfg: cfg_median(cur_rec, cfg, "e0_to_e4_ns")
+        for _sys, cfg in T48_ARM_ORDER
+    }
+
+    def short(r: str) -> str:
+        return r if len(r) <= 12 else r[:12]
+
+    lineage_str = " → ".join(
+        f"{lab} (`{short(rv)}`)" for lab, rv, *_ in COMPARISON_LINEAGE
+    )
+    links = ", ".join(
+        f"[{lab}]({ex})" for lab, _rv, _b, _s, _n, ex in COMPARISON_LINEAGE
+    )
+    batches_str = " / ".join(f"`{b}`" for b in sorted(batches))
+    lines = [
+        "<!-- generated by scripts/report-exhibits.py — do not edit -->",
+        "",
+        f"**Current comparison: {label}.** The report's prose cites "
+        'this file wherever it means "the comparison"; a specific '
+        "campaign's exhibit is cited only where that campaign is "
+        "discussed as history. Advancing a campaign moves "
+        "`CURRENT_COMPARISON` in `scripts/report-exhibits.py` and "
+        "regenerates this file.",
+        "",
+        f"Campaign lineage: {lineage_str}. Each campaign's full "
+        f"exhibit stays frozen under its own pin: {links}.",
+        "",
+        f"Source: `git show {rev}:results/{{runs,phases}}.csv` "
+        f"(batches {batches_str}, measured kernel `{sha_prefix}`, "
+        f"n={n_per_arm} recorded per arm, warmup excluded). "
+        "**RISC-V under QEMU TCG software emulation.** Working-tree "
+        "CSVs are not read. Regeneration: `just report-exhibits`.",
+        "",
+        "### Comparison (E0→E4)",
+        "",
+        "| system | config | n | E0→E4 median | IQR | min | D_fin median |",
+        "|---|---|---:|---:|---:|---:|---:|",
+    ]
+    for sysname, cfg in T48_ARM_ORDER:
+        rows = [r for r in cur_rec if r["config"] == cfg]
+        e4s = [float(r["e0_to_e4_ns"]) for r in rows]
+        dfins = [float(r["d_fin_ns"]) for r in rows]
+        med, iq, mn = stat(e4s)
+        dmed = statistics.median(dfins)
+        lines.append(
+            f"| {sysname} | {cfg} | {len(rows)} | {fmt_ns(med)} | "
+            f"{fmt_ns(iq)} | {fmt_ns(mn)} | {fmt_ns(dmed)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "Ratios are E0→E4 medians under TCG; the emulation "
+            "penalty applies to both arms (KVM-comparability caveat "
+            "in the T4.8 exhibit, unchanged):",
+            "",
+            f"- `release-fast-boot` / `trimmed` = "
+            f"**{fmt_ratio(e4['trimmed'], e4[FAST])}**",
+            f"- `release-fast-boot` / `stock` = "
+            f"**{fmt_ratio(e4['stock'], e4[FAST])}**",
+            "",
+            "Detail — the before/after against the previous "
+            "campaign, the E0→first-connect control, trim and "
+            "observer cost, and the serial-regime note — lives in "
+            f"the frozen campaign exhibit: [{exhibit}]({exhibit}).",
             "",
         ]
     )
@@ -3781,6 +3939,101 @@ def cmd_selftest() -> int:
         "validate_t47 planted t47c/t47b pair",
     )
 
+    # --- current-comparison alias (cross-system-current.md) ---
+    cur_entry = current_comparison_entry()
+    if cur_entry[0] != CURRENT_COMPARISON:
+        raise ExhibitFail(
+            "TEST FAIL: current_comparison_entry resolved wrong label"
+        )
+    fired.append("current_comparison_entry resolves the lineage tail")
+    expect_fail(
+        lambda: current_comparison_entry(current="T4.9z"),
+        "not in lineage",
+        "alias unknown CURRENT_COMPARISON",
+    )
+    expect_fail(
+        lambda: current_comparison_entry(current="T4.8"),
+        "not the lineage tail",
+        "alias history-as-current",
+    )
+
+    def alias_run(cfg: str, sysname: str, batch: str) -> dict:
+        return {
+            "batch_id": batch,
+            "warmup": "0",
+            "system": sysname,
+            "config": cfg,
+            "git_sha": "cafe1234deadbeef",
+            "e0_to_e4_ns": "1000",
+            "d_fin_ns": "10",
+        }
+
+    alias_entry = (
+        "T4.Xf",
+        "fixture-rev",
+        frozenset({"x-1", "x-2"}),
+        "cafe1234",
+        2,
+        "cross-system-fixture.md",
+    )
+    alias_rec = [
+        alias_run(cfg, sysname, batch)
+        for sysname, cfg in T48_ARM_ORDER
+        for batch in ("x-1", "x-2")
+    ]
+    write_cross_system_current(alias_rec, entry=alias_entry)
+    fired.append("write_cross_system_current accepts a clean fixture")
+    moved_batch = [
+        dict(r, batch_id="x-3" if r["batch_id"] == "x-2" else r["batch_id"])
+        for r in alias_rec
+    ]
+    expect_fail(
+        lambda: write_cross_system_current(moved_batch, entry=alias_entry),
+        "does not match the lineage entry",
+        "alias batch-set mismatch",
+    )
+    half = [
+        r
+        for r in alias_rec
+        if not (r["config"] == "stock" and r["batch_id"] == "x-2")
+    ]
+    expect_fail(
+        lambda: write_cross_system_current(half, entry=alias_entry),
+        "recorded trials, want",
+        "alias half-populated arm",
+    )
+    no_dfin = [dict(r) for r in alias_rec]
+    for r in no_dfin:
+        del r["d_fin_ns"]
+    expect_fail(
+        lambda: write_cross_system_current(no_dfin, entry=alias_entry),
+        "missing d_fin_ns",
+        "alias missing field",
+    )
+    mixed_sha_alias = [dict(r) for r in alias_rec]
+    mixed_sha_alias[0]["git_sha"] = "beef9999deadbeef"
+    expect_fail(
+        lambda: write_cross_system_current(mixed_sha_alias, entry=alias_entry),
+        "mixed git_sha",
+        "alias mixed sha",
+    )
+    expect_fail(
+        lambda: write_cross_system_current(
+            [dict(r, git_sha="beef9999deadbeef") for r in alias_rec],
+            entry=alias_entry,
+        ),
+        "does not start with",
+        "alias sha-prefix",
+    )
+    expect_fail(
+        lambda: read_csv_text(
+            git_show("no-such-pin", "results/runs.csv"),
+            "no-such-pin:results/runs.csv",
+        ),
+        "git show",
+        "alias missing-CSV pin (git_show fails closed)",
+    )
+
     print("TEST PASS: report-exhibits fail-closed selftest")
     for line in fired:
         print(f"  fired: {line}")
@@ -3925,6 +4178,15 @@ def main() -> int:
             ),
             encoding="utf-8",
         )
+        cur_entry = current_comparison_entry()
+        cur_runs = read_csv_text(
+            git_show(cur_entry[1], "results/runs.csv"),
+            f"{cur_entry[1]}:results/runs.csv",
+        )
+        (OUT_DIR / "cross-system-current.md").write_text(
+            write_cross_system_current(recorded(cur_runs), entry=cur_entry),
+            encoding="utf-8",
+        )
         linux_serial = git_show(SERIAL_REV, LINUX_SERIAL_PATH)
         whim_serial = git_show(SERIAL_REV, WHIMBREL_SERIAL_PATH)
         labels_text = git_show(LABEL_REV, LABEL_PATH)
@@ -3956,6 +4218,7 @@ def main() -> int:
         print((OUT_DIR / "cross-system.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "cross-system-t48b.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "cross-system-t48c.md").read_text(encoding="utf-8"))
+        print((OUT_DIR / "cross-system-current.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "linux-decomposition.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "t47-firmware.md").read_text(encoding="utf-8"))
         return 0
