@@ -247,7 +247,7 @@ def git_show(rev: str, path: str) -> str:
         ["git", "show", f"{rev}:{path}"],
         cwd=ROOT,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     if proc.returncode != 0:
         err = proc.stderr.strip() or proc.stdout.strip() or "git show failed"
@@ -4130,6 +4130,7 @@ def main() -> int:
                 base_rec, after_rec, baseline_summary, t48_rec=t48_rec
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "phase-decomposition.md").write_text(
             write_phase_table(
@@ -4140,6 +4141,7 @@ def main() -> int:
                 e2e3g_after_fast,
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "edges.md").write_text(
             write_edges(
@@ -4151,22 +4153,26 @@ def main() -> int:
                 t48_phases=t48_phases,
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "dump-placement.md").write_text(
             write_dump_placement(),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "cross-system.md").write_text(
             write_cross_system(
                 t48_rec, t48_phases, after_rec, after_phases
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "cross-system-t48b.md").write_text(
             write_cross_system_t48b(
                 t48b_rec, t48b_phases, t48_rec, t48_phases
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "cross-system-t48c.md").write_text(
             write_cross_system_t48c(
@@ -4177,6 +4183,7 @@ def main() -> int:
                 manifest_text=t48c_manifest,
             ),
             encoding="utf-8",
+            newline="\n",
         )
         cur_entry = current_comparison_entry()
         cur_runs = read_csv_text(
@@ -4186,6 +4193,7 @@ def main() -> int:
         (OUT_DIR / "cross-system-current.md").write_text(
             write_cross_system_current(recorded(cur_runs), entry=cur_entry),
             encoding="utf-8",
+            newline="\n",
         )
         linux_serial = git_show(SERIAL_REV, LINUX_SERIAL_PATH)
         whim_serial = git_show(SERIAL_REV, WHIMBREL_SERIAL_PATH)
@@ -4201,10 +4209,12 @@ def main() -> int:
                 manifest_text,
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "t47-firmware.md").write_text(
             write_t47_firmware(t47_rec, t47_phases),
             encoding="utf-8",
+            newline="\n",
         )
         print(
             f"TEST PASS: exhibits from {BASELINE_TAG} + {AFTER_REV} + "
@@ -4228,6 +4238,14 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Exhibit bytes and console output are a function of the pinned
+    # inputs, never of the invoking machine's locale (DEBUGGING.md:
+    # "Regenerated exhibits all show modified, with mangled
+    # characters").
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     if sys.argv[1:] == ["selftest"]:
         try:
             sys.exit(cmd_selftest())

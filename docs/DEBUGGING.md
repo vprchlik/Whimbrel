@@ -597,3 +597,31 @@ timestamps rather than assuming them. Related trap from the same
 incident: the runner logged `date -u` while file mtimes showed local
 time, and the 30-second run was read as four hours — label every
 logged clock UTC explicitly.
+
+## Regenerated exhibits all show modified, with mangled characters
+
+Symptom: after running an exhibit generator on a Windows host,
+`git status` shows every existing exhibit modified when only a new
+file was expected; every line of every file diffs, and in some
+exhibits non-ASCII characters read as mojibake — `—` as `â€”`, `×`
+as `Ã—`, `µ` as `Âµ`, `→` as `â†’`.
+
+Cause: two locale dependencies, not one. Reads:
+`subprocess.run(..., text=True)` decodes `git show` output with the
+platform's preferred encoding (cp1252 on Windows), so UTF-8 bytes
+coming out of git become mojibake in memory and are then faithfully
+written back out as UTF-8 — double-encoded. Writes:
+`Path.write_text(..., encoding="utf-8")` still translates `\n` to
+`os.linesep`, so on Windows every line gains a `\r` and every file
+diffs wholesale even where the characters survived. The committed
+exhibits were generated on the Linux bench host (UTF-8, LF), which
+is why the same script was byte-stable there.
+
+Fix / practice: generator output is a function of the pinned inputs,
+never of the invoking machine's locale — pin both axes on every text
+I/O: `subprocess.run(..., encoding="utf-8")` for reads,
+`write_text(..., encoding="utf-8", newline="\n")` for writes
+(applied to report-exhibits.py, regime-witness.py,
+d0070-pcap-pass.py). The regenerate-then-`git status` idempotence
+check is the detector: any *existing* exhibit showing modified after
+a regeneration is a stop, not noise to work around.

@@ -67,7 +67,7 @@ class Fail(Exception):
 def show(rev: str, path: str) -> str:
     try:
         return subprocess.check_output(
-            ["git", "show", f"{rev}:{path}"], cwd=ROOT, text=True,
+            ["git", "show", f"{rev}:{path}"], cwd=ROOT, encoding="utf-8",
             stderr=subprocess.PIPE,
         )
     except subprocess.CalledProcessError as e:
@@ -728,7 +728,7 @@ def main() -> int:
         lines.append("")
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text("\n".join(lines), encoding="utf-8")
+    OUT.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     print(f"TEST PASS: regime-witness → {OUT}")
     print("\n".join(lines))
     return 0
