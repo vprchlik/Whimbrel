@@ -35,12 +35,12 @@ E2→E3g median of the fast-boot configuration reported in
 profile is flat: no phase exceeds 19% of 6.43 ms. The T4.3 freeze
 had been two walks of the frame free list; T4.4 collapsed those;
 T4.6 mixed-granularity paging took the next 42%. Safe vs fast is
-still a large factor. T4.8 fills the Linux row: on RISC-V under
-QEMU TCG software emulation, same host, fast-boot E0→E4 is 14.5×
-the trimmed Linux baseline and 18.1× stock
-([exhibits/cross-system.md](exhibits/cross-system.md)). The honest
-E0→E4 number counts QEMU startup, guest boot wait, and sub-ms
-delivery once each (D-0070/D-0071); E3w→E4 is retired.
+still a large factor. T4.8c fills the Linux row: on RISC-V under
+QEMU TCG software emulation, same host, trimmed Linux takes 5.1×
+fast-boot's E0→E4 and stock 17.8×
+([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
+The honest E0→E4 number counts QEMU startup, guest boot wait, and
+sub-ms delivery once each (D-0070/D-0071); E3w→E4 is retired.
 
 A three-way comparison including Unikraft was attempted and ended
 at a pre-registered no-go, not a schedule limit (D-0063). At the
@@ -66,7 +66,7 @@ meaningful.
 ## Background
 
 *(stub)* Whimbrel is a single-hart, single-address-space rv64gc
-unikernel: OpenSBI, Sv39, one U-mode app, five syscalls, virtio-net,
+unikernel: OpenSBI, Sv39, one U-mode app, seven syscalls, virtio-net,
 HTTP/1.0 one-shot. Built to be explained, then measured. Related
 work (unikernels, TCG vs silicon, boot-time literature) belongs here
 at T4.11, not as a literature dump that outruns the apparatus.
@@ -161,8 +161,8 @@ E3w→E4 is therefore the time from the HTTP frame appearing in the
 filter-dump to Python `recv` — slirp/hostfwd + host TCP + client
 read, plus any QEMU occupancy after the guest has already published
 (D-0066). It is the largest term in honest E0→E4 after T4.4. The
-same QEMU user-net and the same client are used for Linux and
-Unikraft, so the shared conduit does not by itself distort
+same QEMU user-net and the same client are used for the Linux
+arms, so the shared conduit does not by itself distort
 comparisons.
 
 **Linear scaling is the wrong model for small phases.**
@@ -219,8 +219,12 @@ open — see Results.
 
 Exhibit tables: [phase decomposition](exhibits/phase-decomposition.md)
 (D-0064 centerpiece columns), [edges](exhibits/edges.md),
-[dump placement](exhibits/dump-placement.md), and
-[cross-system](exhibits/cross-system.md).
+[dump placement](exhibits/dump-placement.md),
+[cross-system](exhibits/cross-system.md) (T4.8), its successors
+[T4.8b](exhibits/cross-system-t48b.md) and the current
+[T4.8c](exhibits/cross-system-t48c.md),
+[T4.7 firmware](exhibits/t47-firmware.md), and the
+[regime witness](exhibits/regime-witness.md).
 
 ---
 
@@ -409,9 +413,10 @@ listen backlog the moment `listen()` exists — and the main loop
 going live, when slirp first services the queued connection and
 emits the ARP that starts `W`'s clock. A one-clock mechanism check
 (polling filter-dump's incremental pcap writes against the client's
-own stamps) closed the accounting per boot to +0.05…+0.32 ms, and a
-late-connect control showed slirp forwards an accepted connection's
-SYN in 60–160 µs once startup is over. So the former "E3w→E4"
+own stamps; recorded in D-0071, not an exhibit) closed the
+accounting per boot to +0.05…+0.32 ms, and a late-connect control
+(same record) showed slirp forwards an accepted connection's SYN
+in 60–160 µs once startup is over. So the former "E3w→E4"
 decomposes with nothing left over: **QEMU startup (~6.8 ms) +
 waiting for our own guest to boot (`W`) + sub-millisecond delivery
 (`D_fin`)** — the first two already counted once, correctly, in
@@ -502,19 +507,21 @@ IQR — smooth, not snapped to a 1 s grid — so confound A's announce
 mitigation did what it was registered to do.
 
 On RISC-V under QEMU TCG software emulation, same host, same QEMU,
-`release-fast-boot` reaches first HTTP byte 14.5× faster than
-trimmed Linux and 18.1× faster than stock
-([exhibits/cross-system.md](exhibits/cross-system.md)). Published
-unikernel figures (2–3 ms) and Firecracker's ~125 ms Linux boot are
-x86 with KVM hardware virtualization, where absolute times run
-roughly 5–10× lower. Those absolute numbers are not comparable to
-52.28 ms or 759.79 ms; the ratio is, because the emulation penalty
-applies to both arms on the same host.
+`release-fast-boot` reaches first HTTP byte 5.1× faster than
+trimmed Linux and 17.8× faster than stock
+([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
+Published unikernel figures (2–3 ms) and Firecracker's ~125 ms
+Linux boot are x86 with KVM hardware virtualization, where
+absolute times run roughly 5–10× lower. Those absolute numbers are
+not comparable to 51.95 ms or 263.75 ms; the ratio is, because the
+emulation penalty applies to both arms on the same host.
 
 Instrumentation cost is measured, not caveated:
-trimmed-instrumented − trimmed = 23.70 ms for
+trimmed-instrumented − trimmed = 23.66 ms for
 `loglevel=7 printk.time=1 initcall_debug` on the same
-`Image-trimmed` binary (identical `kernel_sha256`).
+`Image-trimmed` binary (identical `kernel_sha256`). The cell
+contains in-window console output, so it is day-scoped (D-0078)
+and holds within the T4.8c campaign, not across campaigns.
 
 S is reported per system, never pooled across systems. D-0071
 pools Whimbrel safe and fast because S is profile-independent on
@@ -527,14 +534,14 @@ not noise.
 
 This is floor-finding, not a trophy. The result is what a
 single-purpose VM's structure buys under those stated conditions.
-Whimbrel's guest work in this campaign is E2→E3g 6.43 ms; the
+Whimbrel's guest work in this campaign is E2→E3g 6.38 ms; the
 phase decomposition
 ([exhibits/phase-decomposition.md](exhibits/phase-decomposition.md))
 shows where that interval goes. No "fastest" without its conditions
 attached.
 
 The trimmed row's good-faith claim is now backed by measurement: it
-beats stock by 188.32 ms, so the trim removed real work rather than
+beats stock by 659.96 ms, so the trim removed real work rather than
 hobbling Linux. The published config is
 `bench/linux/linux-trimmed.fragment` on `qemu_riscv64_virt_defconfig`
 (Buildroot 2026.02.3, kernel 6.18.7). A Linux boot-time specialist
@@ -614,8 +621,11 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
    page-table build) and MMIO-dense phases (virtio) are taxed
    differently than on silicon. Every claim carries "under QEMU TCG".
 2. **slirp is the TCP peer**, not a wire. E3w−E3g prices virtio+slirp.
-   True hostfwd delivery plus client recv is bounded by `D_fin` at
-   63–155 µs ([exhibits/d0070-pcap.md](exhibits/d0070-pcap.md)).
+   True hostfwd delivery plus client recv is sub-millisecond on
+   every measured row: `D_fin` 63–155 µs across the Whimbrel D-0070
+   campaigns ([exhibits/d0070-pcap.md](exhibits/d0070-pcap.md)) and
+   ≤ ~0.3 ms on every T4.8c arm
+   ([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
    The former "E3w→E4" is retired: QEMU startup (D-0071) plus the
    accepted connection waiting for the guest to boot (D-0070),
    mislabeled by E3w's anchoring construction.
@@ -636,9 +646,9 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
 7. **Debug-era history is not evidence.** Regeneration from CSV;
    appendix [appendix-regenerate.md](appendix-regenerate.md).
 8. **Linux-tuning fairness** (D-0062) — measured: trimmed beats
-   stock by 188.32 ms
-   ([exhibits/cross-system.md](exhibits/cross-system.md)), so the
-   trim removed real work. Config published:
+   stock by 659.96 ms
+   ([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)),
+   so the trim removed real work. Config published:
    `bench/linux/linux-trimmed.fragment`. A Linux boot-time
    specialist could likely do better; we claim *a* minimal Linux,
    not *the* minimal Linux. On the T4.8 Image, `FTRACE` is a
@@ -733,8 +743,8 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     occupancy surface is guest work after a guest-side stamp moving
     a host-observed edge. D-0068 tested the PHASE dump as that
     occupant: two N-trials, no E4 movement. The dump stays off the
-    interval on principle. Linux and Unikraft share slirp/hostfwd;
-    they will not share a PHASE dump. If measured runs stopped
+    interval on principle. The Linux arms share slirp/hostfwd;
+    they do not share a PHASE dump. If measured runs stopped
     printing PHASE, the decomposition and E0→E4 would come from
     different boots — that would be its own line.
 17. **A derived metric double-counted guest boot under a
@@ -812,7 +822,9 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     `neigh` retransmit from 1 s to 50 ms via one `RTM_SETNEIGHTBL`
     before the announce. That call is on the measured path and
     inflates the Linux baseline by a measured **2.87 ms** (`T_NEIGH`
-    stamp; ~1.5% of the 188 ms cross-system delta) — a bias toward
+    stamp; ~0.4% of the 659.96 ms trim delta — a smaller share than
+    T4.8's ~1.5% only because the denominator grew; the 2.87 ms
+    itself is unchanged) — a bias toward
     Whimbrel, applied identically to stock and trimmed so the trim
     comparison is unaffected. An earlier "sub-millisecond" estimate
     was wrong by 3x, which is why the cost is stamped rather than
@@ -866,8 +878,8 @@ branch itself, then a re-pin to that head.)* `virtq_init`
 remains eligible at 13% of
 6.43 ms and is not the next action. D-0060 is
 declined-by-subsumption. `-bios none` (D-0061). T4.3b audit
-cleanup. T4.8b (D-0073) is the FTRACE act-on, spec'd, not yet
-run on the bench host; the T4.8 exhibit stays the before.
+cleanup. T4.8b (D-0073) and T4.8c (D-0081) have run; the T4.8
+exhibit stays the before.
 
 ---
 
@@ -880,6 +892,10 @@ run on the bench host; the T4.8 exhibit stays the before.
 - [Dump placement exhibit](exhibits/dump-placement.md)
 - [Cross-system exhibit](exhibits/cross-system.md)
 - [Cross-system T4.8b exhibit](exhibits/cross-system-t48b.md)
+- [Cross-system T4.8c exhibit](exhibits/cross-system-t48c.md) —
+  the current comparison
+- [T4.7 firmware-removal exhibit](exhibits/t47-firmware.md)
+- [Regime-witness exhibit](exhibits/regime-witness.md)
 - [Linux boot decomposition](exhibits/linux-decomposition.md)
 - [D-0070 pcap pass exhibit](exhibits/d0070-pcap.md) (generated on
   the bench host; committed from there)
