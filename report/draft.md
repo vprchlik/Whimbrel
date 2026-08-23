@@ -38,10 +38,28 @@ T4.6 mixed-granularity paging took the next 42%. Safe vs fast is
 still a large factor. T4.8 fills the Linux row: on RISC-V under
 QEMU TCG software emulation, same host, fast-boot E0→E4 is 14.5×
 the trimmed Linux baseline and 18.1× stock
-([exhibits/cross-system.md](exhibits/cross-system.md)). Unikraft
-is empty until T4.9. The honest E0→E4 number counts QEMU startup,
-guest boot wait, and sub-ms delivery once each (D-0070/D-0071);
-E3w→E4 is retired.
+([exhibits/cross-system.md](exhibits/cross-system.md)). The honest
+E0→E4 number counts QEMU startup, guest boot wait, and sub-ms
+delivery once each (D-0070/D-0071); E3w→E4 is retired.
+
+A three-way comparison including Unikraft was attempted and ended
+at a pre-registered no-go, not a schedule limit (D-0063). At the
+pinned riscv64 port — unikraft/unikraft PR #1698, head `e9b1d549`
+— no networked build can boot: the port's PLIC driver registers no
+`fdt_xlat` operation, the generic interrupt layer asserts on that
+NULL pointer while probing virtio-mmio transports, and QEMU's
+`virt` machine always presents those transports, so the crash
+lands during bus probing, before `main`. The fix is roughly
+fifteen lines of new Unikraft driver code, which the spike's
+no-core-patches rule forbids: the measurement would then describe
+our fork, not Unikraft. This is a regression in the port's 2026
+rebase, not an absence of riscv64 support. The quantitative
+comparison is therefore two-way against Linux; Unikraft appears as
+a qualitative boot-path analysis from source at the same pin
+(Results). A Unikraft build on another ISA was available and
+deliberately not run: a cross-ISA number cannot share the
+same-host, same-QEMU conditions that make the Linux ratios
+meaningful.
 
 ---
 
@@ -572,6 +590,19 @@ Printk `Run /init` → shutdown = 43.31 ms = 9.45 + 26.18 + 7.68.
 Unmeasured prefix: 63 untimed OpenSBI lines, then 39 kernel lines
 at `0.000000` until `sched_clock` at 38 µs. No E2 constructed.
 
+### Unikraft: boot-path analysis at the pin
+
+*(stub — write at T4.11 from D-0063's Outcome; fallback (3),
+selected 2026-08-23; the referent of the abstract's Unikraft
+paragraph)* Source-level riscv64 analysis at unikraft/unikraft
+PR #1698 head `e9b1d549`: the no-go trace (NULL `fdt_xlat`,
+assert during virtio-mmio bus probing, crash before `main`);
+regression from #461, not absent riscv64 support; what looked
+right and what was not verified; the cross-ISA build available
+and deliberately not run, and why. Qualitative only — no
+quantitative claims, and nothing here ever shares a table with
+measured numbers.
+
 ---
 
 ## Threats to validity
@@ -647,6 +678,9 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
    `DEBUG_FS`, `FB`, `VT`, `PINCTRL`, `I2C`, `SPI`, `THERMAL`,
    `CPU_IDLE` (named deferred: no-boot risk or idle path).
 9. **Unikraft pin** (D-0063) — stated when that row exists.
+   *(T4.11: reword — under fallback (3), selected 2026-08-23, no
+   row will ever exist; state the pin unconditionally in the
+   Results Unikraft section and point this item at it.)*
 10. **Instrumentation observer effect.** Stamp overhead is a generated
     row in [exhibits/edges.md](exhibits/edges.md) (5.5 µs on
     fast-boot). `print_after_response` is a second observer. D-0068
@@ -824,7 +858,12 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
 
 ## Future work
 
-Unikraft spike (D-0063). `virtq_init` remains eligible at 13% of
+Unikraft: the spike is concluded (D-0063; no-go at the pin,
+fallback (3) selected 2026-08-23). *(T4.11: write the successor
+future-work item — the one route back to (1) that D-0063's
+Standing notes: the `fdt_xlat` stub fixed upstream in the PR
+branch itself, then a re-pin to that head.)* `virtq_init`
+remains eligible at 13% of
 6.43 ms and is not the next action. D-0060 is
 declined-by-subsumption. `-bios none` (D-0061). T4.3b audit
 cleanup. T4.8b (D-0073) is the FTRACE act-on, spec'd, not yet
