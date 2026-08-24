@@ -53,6 +53,10 @@ fast-boot's E0→E4 and stock 17.8×
 ([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
 The honest E0→E4 number counts QEMU startup, guest boot wait, and
 sub-ms delivery once each (D-0070/D-0071); E3w→E4 is retired.
+*(T4.11: the rewrite states the T4.7 firmware result here —
+replacing OpenSBI with the D-0079 shim, −23.69 ms per batch, the
+largest single E0→E4 change —
+[exhibits/t47-firmware.md](exhibits/t47-firmware.md).)*
 
 A three-way comparison including Unikraft was attempted and ended
 at a pre-registered no-go, not a schedule limit (D-0063). At the
@@ -497,7 +501,8 @@ By D-0058's letter the ladder is not closed: `virtq_init` still
 clears 5% of E2→E3g. D-0068 was the next *action* and has been
 measured: it did not move E0→E4. The Linux campaigns have since
 run (T4.8 → T4.8b → T4.8c), and T4.7 measured the firmware
-window. Fast E0→E4 is
+window — not a rung: it changes the boot contract (see "Firmware
+removal" below). Fast E0→E4 is
 51.66 ms on the T4.6 after-ladder pin; skipping the discarded
 virtqueue pass is ~0.8 ms of that (1.6%). virtq_init stays
 recorded-eligible. The floor is not declared. The former ~31 ms
@@ -529,6 +534,47 @@ Co-edit checklist, walked in the same change:
 `held = tables + leftover`; D-0036 / D-0039 prose (7 = 5 + 2);
 justfile virtio probe greps (row format unchanged, greps did not
 move); DEBUGGING.md superpage first-response note.
+
+### Firmware removal (T4.7 / D-0079)
+
+Not a ladder rung: the D-0079 M-mode shim changes the boot
+contract — a second lane in the `-bios` slot — rather than
+removing guest work under the same contract, so it is a labeled
+per-system result beside the ladder, not a row in it. All numbers:
+[exhibits/t47-firmware.md](exhibits/t47-firmware.md) (pin
+`c2759e2`, four Whimbrel arms, two firmware lanes, one batch set,
+n=60 per arm).
+
+Replacing OpenSBI with the shim cuts fast-boot
+spawn-to-first-HTTP-byte from 52.27 / 52.19 ms to
+28.58 / 28.50 ms per batch (ΔE0→E4 −23.691 / −23.689 ms, 1.8×).
+The exhibit's two claims are different kinds of number and stay
+separate: **Claim A**, the pooled guest-side change, is ΔE2→E3g
+**−0.714 ms** (stability-gated; 6.40 → 5.69 ms); **Claim B**,
+ΔE0→E4, is reported per batch and never pooled, because the
+quantity being removed — the OpenSBI-side firmware window — is
+volatile across campaigns. The decomposition is three terms, not
+one firmware number: guest firmware execution removed
+(−22.972 / −22.984 ms per batch), ΔS — host-side firmware load —
+at −0.002 ms, and the −0.714 ms seam envelope. The seams are
+itemised inside that envelope from D-0079's registered set
+(replaced-SBI call sites or in-window print): `stvec` −222.1 µs,
+`frame_init` −74.1 µs, `E3g` −517.5 µs.
+
+The cross-system comparison uses the OpenSBI lane, not this one.
+That is D-0079's measurement framing, restating D-0061: variant,
+never replacement — `-bios default` keeps every gate and every
+primary number, the cross-system table's Whimbrel rows stay
+OpenSBI, and a registered falsifier makes any movement of the
+`-bios default` cross-system rows a stop. Linux structurally
+cannot take this rung — no Linux row can swap its firmware for a
+purpose-built M-mode shim — and that asymmetry is the finding,
+reported as a labeled per-system result rather than folded into
+the ratio. Two boundaries carry over: the shim lane's console is
+polled S-mode UART, so safe-profile numbers never compare across
+lanes (the comparison profile is fast-boot, zero in-window
+bytes), and the shim lane's S is profile-dependent — an open
+D-0079 item with no consumer.
 
 ### Cross-system
 
