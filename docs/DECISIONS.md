@@ -6010,10 +6010,10 @@ D-0011 onward are working decisions made under those constraints.
 
     | arm | b1 E0→E4 | b2 E0→E4 | b1 E2→E3g | b2 E2→E3g |
     |---|---:|---:|---:|---:|
-    | release-fast-boot | 52.20 (0.72) | 52.13 (0.34) | 6.406 (0.056) | 6.393 (0.057) |
-    | release-default | 139.67 (1.17) | 139.41 (0.95) | 90.816 (0.581) | 90.799 (0.855) |
-    | m-release-fast-boot | 28.56 (0.60) | 28.39 (0.25) | 5.738 (0.155) | 5.656 (0.082) |
-    | m-release-default | 96.70 (0.82) | 96.42 (0.45) | 73.597 (0.330) | 73.525 (0.291) |
+    | release-fast-boot | 52.20 (0.64) | 52.13 (0.32) | 6.406 (0.051) | 6.393 (0.052) |
+    | release-default | 139.67 (1.10) | 139.41 (0.87) | 90.816 (0.506) | 90.799 (0.829) |
+    | m-release-fast-boot | 28.56 (0.54) | 28.39 (0.23) | 5.738 (0.152) | 5.656 (0.076) |
+    | m-release-default | 96.70 (0.76) | 96.42 (0.40) | 73.597 (0.306) | 73.525 (0.265) |
 
   - Per-batch fast-pair ΔE0→E4 (shim − OpenSBI): **−23.65 ms**
     (b1) and **−23.74 ms** (b2) — batch-consistent to 90 µs.
@@ -6193,7 +6193,7 @@ D-0011 onward are working decisions made under those constraints.
     recorded trials; counts gated; `falsifier3_mtrap: 0 hits in 264
     trial serials + canary` (computed, fail-closed). **Regime:
     inflated, established by the witness** — all 60 recorded
-    safe-arm trials in 15.613–16.535 ms (median 16.180, IQR 0.142),
+    safe-arm trials in 15.613–16.535 ms (median 16.180, IQR 0.141),
     uniform across batches (16.249/16.131); the canary read 12.007
     and **disagrees**, the second of two comparable cases — see the
     D-0078 amendment refutation block for what the canary actually
@@ -6221,8 +6221,8 @@ D-0011 onward are working decisions made under those constraints.
     - Falsifier 5 PASS by construction: the t48b exhibit pins are
       immutable git objects; nothing republished.
   - **Claims (design (d)). Claim A**, pooled ΔE2→E3g, stability-
-    gated: **−0.714 ms** (fast 6.402, IQR 0.060; m-fast 5.688, IQR
-    0.102; per batch −0.718/−0.703; inside the registered
+    gated: **−0.714 ms** (fast 6.402, IQR 0.057; m-fast 5.688, IQR
+    0.098; per batch −0.718/−0.703; inside the registered
     [−1.1, −0.4]; t47 read −0.717 — reproduction to 3 µs across a
     day). **Claim B**, ΔE0→E4 per batch: **−23.691 (batch 1),
     −23.689 (batch 2) ms** — the two batches agree to 2 µs.
@@ -6269,6 +6269,30 @@ D-0011 onward are working decisions made under those constraints.
     drift probe; the `gate-failures.csv` rotation fix; computing
     falsifiers 1, 2, ΔS and 6; the audit's other prose-only
     registrations.
+- **Correction to the t47b and t47c IQR cells (2026-08-24).** The
+  per-arm table under the aborted confirmation, and the t47c
+  witness and Claim A IQRs, were replaced in place with harness
+  `iqr()` (inclusive / type 7). The published copies did not come
+  from `scripts/bench.py`. t47b's came from `statistics.quantiles()`
+  at its default, which is exclusive / type 6 while the harness is
+  inclusive / type 7 — all sixteen cells matched exclusive after
+  the table's own rounding, and zero matched the harness. t47c's
+  came from a different hand-typed quartile, integer-index
+  `s[3n//4] - s[n//4]` (n=60: `s[45] - s[15]`), identified by the
+  banker's-rounding fingerprint on 0.1425 → 0.142; exclusive
+  formats as 0.103 / 0.155 and inclusive as 0.098 / 0.141, so t47c
+  was neither. Replaced: t47b IQR column 0.72/0.34/0.056/0.057,
+  1.17/0.95/0.581/0.855, 0.60/0.25/0.155/0.082, 0.82/0.45/0.330/
+  0.291 → 0.64/0.32/0.051/0.052, 1.10/0.87/0.506/0.829, 0.54/0.23/
+  0.152/0.076, 0.76/0.40/0.306/0.265; t47c witness 0.142 → 0.141,
+  Claim A 0.060 / 0.102 → 0.057 / 0.098. Every median in those
+  tables was exact to the nanosecond; only dispersion was
+  affected. No gate or falsifier uses IQR, so no verdict changed
+  and no campaign needed re-running. The live T4.7 exhibit already
+  printed harness inclusive from the same pin (`c2759e2`), so only
+  the typed copy in this entry was wrong. Nothing structural stops
+  this recurring: the generators are gated; a hand-typed number in
+  an entry is not. That is why entries quote exhibits.
 - Revisit trigger: any falsifier; QEMU moving the `virt` FDT or
   reset address (checkpoint 0 and the `check_dtb` assert both catch
   it loudly); or the seams demanding a change outside D-0061's
