@@ -135,8 +135,10 @@ into [exhibits/machine-spec.md](exhibits/machine-spec.md) by
 `just report-exhibits`.
 
 **T4.4.** Batches `20260817T052349Z-1` and `20260817T052349Z-2`,
-measured kernel `83ca9f9`. Kept as the pre-superpage pin; not the
-after-ladder columns.
+measured kernel `83ca9f9`, sourced from
+`git show t44:results/{runs,phases}.csv` into
+[exhibits/t44-bump.md](exhibits/t44-bump.md). Kept as the
+pre-superpage pin; not the after-ladder columns.
 
 **T4.6 after-ladder (superpages).** Batches `20260817T061753Z-1`
 and `20260817T061753Z-2`, measured kernel `76830e13`, sourced from
@@ -198,9 +200,12 @@ and the main loop that pumps slirp are host state that guest work
 writes as a side effect of existing. T4.4 and T4.6 are a matched
 pair. After T4.4 stopped linking ~31k free-list nodes (~125 MiB),
 later phases ran against a warmer data cache and TLB: `page_verify`
-−7%, `E3g` −13%. After T4.6 deleted the 32k-iteration verify loop,
-`freeze` — which the rung does not call — went 7.3 → 12.2 µs (+67%)
-because the next instructions met a colder TCG translation cache.
+−7%, `E3g` −13% ([exhibits/t44-bump.md](exhibits/t44-bump.md)).
+After T4.6 deleted the 32k-iteration verify loop, `freeze` — which
+the rung does not call — went 7.3 µs (the T4.4 value, same exhibit;
+the baseline pin's 7.5 µs is a different campaign, not a conflict)
+→ 12.2 µs (+67%) because the next instructions met a colder TCG
+translation cache.
 Same cause, opposite signs. Both deltas are sub-instrumentation-noise
 in absolute terms (stamp overhead is ~5.5 µs on fast-boot; the
 `freeze` extra is ~5 µs). They are not second hypotheses and not
@@ -219,6 +224,7 @@ open — see Results.
 
 Exhibit tables: [phase decomposition](exhibits/phase-decomposition.md)
 (D-0064 centerpiece columns), [edges](exhibits/edges.md),
+[T4.4 bump](exhibits/t44-bump.md),
 [dump placement](exhibits/dump-placement.md),
 [cross-system-current](exhibits/cross-system-current.md) (the
 current comparison), the frozen campaign exhibits
@@ -272,7 +278,9 @@ flagship number.
 ### T4.4 prediction outcome
 
 Pre-registered against `baseline-t4.3` in D-0065 before the
-dedicated-host rerun. Mechanism and magnitude were correct. The
+dedicated-host rerun; the actual column is generated in
+[exhibits/t44-bump.md](exhibits/t44-bump.md). Mechanism and
+magnitude were correct. The
 headline arithmetic beat the ~9.5 ms projection. Three tight leftover
 bounds were missed. Every falsification line (≥ 1 ms, or a third
 phase vanishing) held. Point estimates on those leftovers were
@@ -288,8 +296,10 @@ the audit recorded as finding 10 (`task_init` / `virtq_init` /
 | safe `freeze` | < 50 µs | 100.0 µs | bound missed; still collapsed from 4.88 ms |
 | unnamed phase vanishes | would falsify | none vanished | held |
 
-Headline edges, generated: fast E2→E3g 21.42 → 9.17 ms (−57%);
-fast E0→E4 67.05 → 54.52 ms; safe E2→E3g 94.88 → 78.25 ms.
+Headline edges, generated in
+[exhibits/t44-bump.md](exhibits/t44-bump.md): fast E2→E3g
+21.42 → 9.17 ms (−57%); fast E0→E4 67.05 → 54.52 ms; safe E2→E3g
+94.88 → 78.25 ms.
 
 Two unnamed phases moved without vanishing, so they do not falsify.
 `page_verify` 2.57 → 2.39 ms (−7%). `E3g` 1.42 → 1.24 ms (−13% in
@@ -319,8 +329,8 @@ Headline edges: fast E2→E3g 9.17 → 6.43 ms (−30%); cumulative from
 Arithmetic remainder if only paging moved: 9.17 − 2.72 = 6.45 ms;
 actual 6.43 ms.
 
-`freeze` 7.3 → 12.2 µs is the cold-translation half of the matched
-TCG pair in Methodology. Linear-vs-measured `page_verify` (~40 µs
+`freeze` 7.3 µs (T4.4 pin) → 12.2 µs is the cold-translation half
+of the matched TCG pair in Methodology. Linear-vs-measured `page_verify` (~40 µs
 extrapolated, 731 µs measured, ~75 ns/leaf over ~32k becoming
 ~1.3 µs/leaf over ~580) is the D-0069 worked example there.
 
@@ -429,7 +439,8 @@ reported as `D_fin`.
 
 | rung | hypothesis | E2→E3g after | Δ vs `baseline-t4.3` | disposition |
 |---|---|---|---|---|
-| bump / lazy free-list | stop linking ~31k virgin frames; `free_count()` is bump arithmetic | 9.17 ms | −12.25 ms (−57%) | landed T4.4 (D-0065); batches `20260817T052349Z-1`/`-2`; subsumes D-0060. Secondary: later phases faster (warm data cache; matched pair) |
+| bump / lazy free-list | stop linking ~31k virgin frames; `free_count()` is bump arithmetic | 9.17 ms | −12.25 ms (−57%) | landed T4.4 (D-0065); pin `t44`, batches `20260817T052349Z-1`/`-2`
+([exhibits/t44-bump.md](exhibits/t44-bump.md)); subsumes D-0060. Secondary: later phases faster (warm data cache; matched pair) |
 | D-0060 allocated counter | `free_count = TOTAL − allocated` on the current list | — | — | declined-by-subsumption |
 | 2 MiB superpages (D-0059) | mixed-granularity identity map; level-aware verifier; grain-aware `assert_range` | 6.43 ms | −15.00 ms (−70% vs freeze); −2.74 ms (−30% vs T4.4) | **landed T4.6**; batches `20260817T061753Z-1`/`-2`; `tables_used`=5; paging 3.84 → 1.12 ms. Phase ranges over (D-0069); E2→E3g in range. Secondary: `freeze` slower (cold I-translation; matched pair) |
 | `virtq_init` skip discarded program+verify | first pass wiped by `net::init` reset; `fill_descriptors` stays | — | 842 µs = 13% of 6.43 ms; 5% bar is 322 µs | **eligible, not next.** Ceiling on the gain. Linux takes the honest number |
@@ -479,7 +490,7 @@ window; `tables_used` 67 → 5 (landed).
 
 The pre-registered ranges, kept as the prediction record:
 
-| metric | now | projected range | falsify if |
+| metric | T4.4 | projected range | falsify if |
 |---|---|---|---|
 | `page_verify` | 2.39 ms | 80–400 µs if grain-correct; 1.5–2.2 ms if still 4 KiB-stepping (failed co-edit) | ≥ 1.0 ms (walk did not shrink) or < 30 µs (something else dropped) |
 | `page_build` | 1.45 ms | 50–300 µs | ≥ 0.8 ms |
@@ -891,6 +902,7 @@ exhibit stays the before.
   findings 16–23).
 - [Phase decomposition exhibit](exhibits/phase-decomposition.md)
 - [Edges exhibit](exhibits/edges.md)
+- [T4.4 bump exhibit](exhibits/t44-bump.md)
 - [Dump placement exhibit](exhibits/dump-placement.md)
 - [Cross-system exhibit](exhibits/cross-system.md)
 - [Cross-system T4.8b exhibit](exhibits/cross-system-t48b.md)
