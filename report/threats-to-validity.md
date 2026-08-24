@@ -295,49 +295,63 @@ item is mitigated-and-measured or stated.
     fix-bearing configurations. Every no-event count in this
     section should be read with that denominator.
 
-21. **The cost of a guest serial byte is a per-boot host variable;
-    numbers containing in-window console output are day-comparable
-    only with a same-day control.** Between T4.8 and T4.8b —
+21. **The cost of a guest serial byte is a campaign-scoped host
+    regime; numbers containing in-window console output compare
+    only within one regime** (D-0078 and its amendment;
+    `report/exhibits/regime-witness.md`). Between T4.8 and T4.8b —
     kernel, QEMU, argv, pins and governor byte-identical — the
     serial-byte path (DBCN ecall → 16550 MMIO → chardev write)
-    stepped from ~5.8 to ~6.8 µs/byte (+17 %) — initially read as
-    per-boot; the canary's first uses showed the state flips on a
-    minutes timescale, with campaigns internally uniform —
-    verified at trial grain, not inferred from IQRs (D-0078
-    act-on). The evidence
-    grain is phases×bytes: every safe-profile phase grew in
-    proportion to the bytes it prints (~1.0 µs/byte across a 30×
-    range of segment sizes), `frame_init`'s mtime-anchored tick
-    wait absorbed it exactly as a wall-clock anchor predicts, and
-    a same-day two-shell A/B exonerated the launcher.
+    stepped from ~5.8 to ~6.8 µs/byte (+17 %). The evidence grain
+    is phases×bytes: every safe-profile phase grew in proportion
+    to the bytes it prints (~1.0 µs/byte across a 30× range of
+    segment sizes), `frame_init`'s mtime-anchored tick wait
+    absorbed it exactly as a wall-clock anchor predicts, and a
+    same-day two-shell A/B exonerated the launcher. The recorded
+    witness (the safe arm's per-trial `page_verify`) divides into
+    two clusters at ~14 ms; every recorded campaign is internally
+    uniform (T4.8 and both D-0068 invocations deflated, T4.8b
+    inflated, T4.8c deflated per its canary columns). Two earlier
+    readings are superseded: per-boot variation, and — from the
+    canary's first uses — a state flipping on a minutes timescale.
+    The warmup-position join refutes the flip: the disagreeing
+    canaries and every batch-boundary first safe warmup that dips
+    land in one structural deflated cluster ([11.78, 12.11] ms, 8
+    boots), lane-independent and host-side of the polled UART — a
+    position effect, not a mid-run flip.
     (a) **Exposed:** safe-profile (`release-default`) phase deltas,
     its `W` and E0→E4 (13,117 in-window bytes ≈ 13 ms at the
     step), the `trimmed-instrumented` − `trimmed` observer cost
-    (~11 KB in-window), and any pooling of safe with fast across
-    campaigns. A reader placing T4.8's and T4.8b's five-arm
+    (~11 KB in-window; day-scoped per campaign), and any pooling
+    of safe with fast — or safe with safe — across campaigns
+    whose regimes differ: T4.8b and T4.8c's canaries disagree, so
+    those safe rows do not compare (the T4.8c exhibit says so at
+    its seam). A reader placing T4.8's and T4.8b's five-arm
     tables side by side will see `release-default` +15.8 ms and
-    should read it as the day's serial-byte cost, **not** a
+    should read it as the campaign's serial regime, **not** a
     regression — the binary is hash-identical in both tables'
     rows.
     (b) **Not exposed:** the headline. `release-fast-boot` prints
     zero bytes in its measured window (its dump is post-response,
-    D-0068) and moved 52.28 → 51.87 ms; the Linux quiet rows
-    print ~6 bytes (`READY`) before their stamps; and `stock` —
-    ~900 ms of TCG, virtio and slirp — moved 948.11 → 948.10 ms
-    across the campaigns, the parity control that excludes
-    general host drift. Cross-system ratios and the trim delta
-    are within-campaign and unaffected.
-    (c) **The stability gate structurally cannot catch this.** It
-    compares interleaved batches recorded on the same day, and
-    the variable is constant within a day. Detection needs a
-    cross-campaign anchor: `stock` served as one here by luck of
-    being pinned; D-0078 recommends a recorded per-campaign
-    canary (one safe boot, PHASE deltas kept) so the campaign's
-    starting regime is visible in the batch header rather than
-    reconstructed from the trials — implemented same-day, and its
-    first two runs caught a flip the per-boot framing had missed.
-    A mid-campaign flip remains checkable at trial grain from the
-    safe arm's own deltas.
+    D-0068) and moved 52.28 → 51.87 → 51.95 ms across the three
+    campaigns; the Linux quiet rows print ~6 bytes (`READY`)
+    before their stamps. `stock` — ~900 ms of TCG, virtio and
+    slirp — was the cross-campaign parity control at the
+    T4.8→T4.8b seam (948.11 → 948.10 ms); at the T4.8c seam it
+    moves by design (D-0081) and drift control passes to
+    `release-fast-boot` plus the campaign canary. Cross-system
+    ratios and the trim delta are within-campaign and unaffected.
+    (c) **The stability gate structurally cannot catch this**, and
+    the canary alone is not the certificate. The gate compares
+    interleaved batches recorded on the same day; the regime is
+    uniform within each. The per-campaign canary boot (D-0078,
+    implemented) records the starting regime in the batch header,
+    but it disagreed with the recorded witness twice (t47b, t47c)
+    — the canary failing as a certificate, not a flip. A
+    campaign's regime is therefore the canary joined with the
+    recorded witness, compared only within one kernel family
+    (`report/exhibits/regime-witness.md`); a mid-campaign flip
+    remains checkable at trial grain from the safe arm's own
+    per-trial deltas, and none has been observed.
 
 22. **Open observation: 12–15 ms unexplained interior in Linux
     `/init`'s announce `sendto` (D-0082).** The stamp bracket
