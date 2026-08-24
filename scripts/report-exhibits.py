@@ -14,6 +14,10 @@ pins do not follow it. The T4.8b table comes from its own CSV pin
 (`t48b`, D-0073 after) with T4.8 frozen as the before. The T4.8c
 table comes from `t48c` (D-0081) with T4.8b frozen as the before.
 The T4.7 firmware exhibit comes from the t47c CSV pin (`c2759e2`).
+The T4.4 exhibit comes from the `t44` tag (D-0065), kept as the
+pre-superpage pin. `cross-system-current.md` is an alias for whichever campaign
+CURRENT_COMPARISON names: the report's prose cites it wherever it
+means "the comparison"; per-campaign exhibits stay frozen.
 The working-tree files are not read — a local `just bench` leftover
 cannot become an exhibit.
 
@@ -47,6 +51,15 @@ AFTER_BATCHES = frozenset({"20260817T061753Z-1", "20260817T061753Z-2"})
 AFTER_SHA_PREFIX = "76830e13"
 # Caption label for the after-ladder CSV pin (not the baseline freeze).
 LADDER_LABEL = "superpages"
+
+# T4.4 bump-allocator CSV commit (D-0065), annotated tag `t44` so a
+# reader can `git show t44:…`, same form as t48b / t48c. Measured
+# kernel is git_sha 83ca9f9 (not this object). Old schema; E2→E3g is
+# phases.csv ns_since_e2 at E3g, the baseline / T4.6 construction.
+# Kept as the pre-superpage pin; not the after-ladder columns.
+T44_REV = "t44"
+T44_SHA_PREFIX = "83ca9f9"
+T44_BATCHES = frozenset({"20260817T052349Z-1", "20260817T052349Z-2"})
 
 # D-0068 dump-placement pins. Not ladder rungs; a separate exhibit.
 D68_RUN1_REV = "59e070321ab5ec30ff97830ac3f9f78577511db4"
@@ -86,6 +99,23 @@ D0081_DELTA_HI_NS = -16_000_000
 # D-0078 / regime-witness cluster divide on page_verify. Classifies
 # a generated canary; it is not a campaign number.
 D0078_CANARY_DIVIDE_NS = 14_000_000
+# The current comparison. The report's prose cites
+# cross-system-current.md wherever it means "the comparison"; a
+# specific campaign's exhibit is cited only where that campaign is
+# discussed as history. Advancing a campaign = append its entry
+# (label, rev, batches, sha_prefix, n_per_arm, exhibit file) to
+# COMPARISON_LINEAGE and move CURRENT_COMPARISON to its label; the
+# alias regenerates from the new pin or fails closed — it cannot
+# silently serve a stale or half-populated table.
+COMPARISON_LINEAGE = (
+    ("T4.8", T48_REV, T48_BATCHES, T48_SHA_PREFIX, T48_N_PER_ARM,
+     "cross-system.md"),
+    ("T4.8b", T48B_REV, T48B_BATCHES, T48B_SHA_PREFIX, T48B_N_PER_ARM,
+     "cross-system-t48b.md"),
+    ("T4.8c", T48C_REV, T48C_BATCHES, T48C_SHA_PREFIX, T48C_N_PER_ARM,
+     "cross-system-t48c.md"),
+)
+CURRENT_COMPARISON = "T4.8c"
 # T4.7 confirmation CSV commit (D-0079). Measured kernel is git_sha
 # 346f4c1 (not this object). Four Whimbrel arms, two firmware lanes,
 # one batch set. Working-tree CSVs are not read.
@@ -227,7 +257,7 @@ def git_show(rev: str, path: str) -> str:
         ["git", "show", f"{rev}:{path}"],
         cwd=ROOT,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     if proc.returncode != 0:
         err = proc.stderr.strip() or proc.stdout.strip() or "git show failed"
@@ -1378,6 +1408,133 @@ def write_edges(
     return "\n".join(lines)
 
 
+def write_t44_bump(
+    t44_rec: list[dict],
+    t44_phases: list[dict],
+    base_rec: list[dict],
+    base_phases: list[dict],
+) -> str:
+    """T4.4 bump / lazy free-list pin (D-0065): the edges and phase
+    medians the report quotes, beside their baseline columns.
+
+    Old-schema pin: E2→E3g is phases.csv `ns_since_e2` at `E3g`,
+    the same construction the baseline and T4.6 pins use. Kept as
+    the pre-superpage pin; not the after-ladder columns.
+    """
+    n = sum(1 for r in t44_rec if r["config"] == FAST)
+    batches = tuple(sorted({r["batch_id"] for r in t44_rec}))
+    edges = [
+        (FAST, "E2→E3g",
+         e2e3g_median(base_rec, base_phases, FAST),
+         e2e3g_median(t44_rec, t44_phases, FAST)),
+        (FAST, "E0→E4",
+         cfg_median(base_rec, FAST, "e0_to_e4_ns"),
+         cfg_median(t44_rec, FAST, "e0_to_e4_ns")),
+        (SAFE, "E2→E3g",
+         e2e3g_median(base_rec, base_phases, SAFE),
+         e2e3g_median(t44_rec, t44_phases, SAFE)),
+    ]
+    t44_fast = phase_deltas(t44_rec, t44_phases, FAST)
+    t44_safe = phase_deltas(t44_rec, t44_phases, SAFE)
+    base_fast = phase_deltas(base_rec, base_phases, FAST)
+    base_safe = phase_deltas(base_rec, base_phases, SAFE)
+
+    def pmed(
+        deltas: dict[str, list[float]], phase: str, label: str
+    ) -> float:
+        vals = deltas.get(phase, [])
+        if not vals:
+            raise ExhibitFail(
+                f"TEST FAIL: {label} has no recorded {phase} rows"
+            )
+        return statistics.median(vals)
+
+    phase_rows = [
+        ("frame_init", "fast",
+         pmed(base_fast, "frame_init", "baseline fast"),
+         pmed(t44_fast, "frame_init", "T4.4 fast"),
+         "D-0065 outcome row — the bump-pointer collapse"),
+        ("accounting", "fast",
+         pmed(base_fast, "accounting", "baseline fast"),
+         pmed(t44_fast, "accounting", "T4.4 fast"),
+         "D-0065 outcome row — arithmetic `free_count()`"),
+        ("page_verify", "fast",
+         pmed(base_fast, "page_verify", "baseline fast"),
+         pmed(t44_fast, "page_verify", "T4.4 fast"),
+         "unnamed mover; warm-cache half of the matched TCG pair"),
+        ("E3g", "fast",
+         pmed(base_fast, "E3g", "baseline fast"),
+         pmed(t44_fast, "E3g", "T4.4 fast"),
+         "unnamed mover; same matched pair"),
+        ("freeze", "fast",
+         pmed(base_fast, "freeze", "baseline fast"),
+         pmed(t44_fast, "freeze", "T4.4 fast"),
+         "the T4.6 rung's before — a different pin from the "
+         "baseline column, not a conflict"),
+        ("freeze", "safe",
+         pmed(base_safe, "freeze", "baseline safe"),
+         pmed(t44_safe, "freeze", "T4.4 safe"),
+         "safe profile prints `free_count()`; D-0065 outcome row"),
+    ]
+
+    def pct(base: float, t44: float) -> str:
+        return f"{(t44 - base) / base * 100:+.0f}%"
+
+    lines = [
+        "<!-- generated by scripts/report-exhibits.py — do not edit -->",
+        "",
+        "T4.4 bump / lazy free-list campaign (D-0065), kept as the "
+        "pre-superpage pin. Source: `git show "
+        f"{T44_REV}:results/{{runs,phases}}.csv` (batches "
+        f"`{batches[0]}` / `{batches[1]}`, measured kernel "
+        f"`{T44_SHA_PREFIX}`, n={n} recorded per config, warmup "
+        "excluded). Baseline columns: tag `baseline-t4.3`. "
+        "Old-schema pin: E2→E3g is phases.csv `ns_since_e2` at "
+        "`E3g` — the same construction as the baseline and T4.6 "
+        "pins. The after-ladder (T4.6) columns live in "
+        "[phase-decomposition.md](phase-decomposition.md) and "
+        "[edges.md](edges.md); this exhibit is the rung between. "
+        "Working-tree CSVs are not read. Regeneration: "
+        "`just report-exhibits`.",
+        "",
+        "### Headline edges (`baseline-t4.3` → T4.4)",
+        "",
+        "| config | metric | baseline | T4.4 | Δ | Δ% |",
+        "|---|---|---:|---:|---:|---:|",
+    ]
+    for cfg, metric, b, t in edges:
+        lines.append(
+            f"| {cfg} | {metric} | {fmt_ns(b)} | {fmt_ns(t)} | "
+            f"{fmt_delta(t - b)} | {pct(b, t)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "### Phase medians the report quotes",
+            "",
+            "| phase | profile | baseline | T4.4 | Δ% | what it is |",
+            "|---|---|---:|---:|---:|---|",
+        ]
+    )
+    for phase, profile, b, t, note in phase_rows:
+        lines.append(
+            f"| {phase} | {profile} | {fmt_ns(b)} | {fmt_ns(t)} | "
+            f"{pct(b, t)} | {note} |"
+        )
+    lines.extend(
+        [
+            "",
+            "The fast `freeze` cell is the value the draft's "
+            "matched-TCG-pair discussion quotes as the T4.6 rung's "
+            "before. It sits beside a baseline column from a "
+            "different campaign pin; the two values are two pins, "
+            "not a disagreement.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def cfg_median(rec: list[dict], config: str, field: str) -> float:
     vals = [float(r[field]) for r in rec if r["config"] == config]
     if not vals:
@@ -1928,6 +2085,144 @@ def write_cross_system_t48c(
             f"{fmt_ns(t48b_e2)} (Δ {fmt_delta(t48c_e2 - t48b_e2)}). "
             "The whimbrel arms carry no D-0081 change, and "
             "fast-boot's window has no serial exposure (D-0078).",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def current_comparison_entry(
+    lineage: tuple = COMPARISON_LINEAGE,
+    current: str = CURRENT_COMPARISON,
+) -> tuple:
+    """Resolve CURRENT_COMPARISON against COMPARISON_LINEAGE.
+
+    The current campaign must be the lineage tail: pointing the
+    alias at frozen history is a wiring error, not a request.
+    """
+    labels = [e[0] for e in lineage]
+    if current not in labels:
+        raise ExhibitFail(
+            f"TEST FAIL: CURRENT_COMPARISON {current!r} not in "
+            f"lineage {labels}"
+        )
+    if current != labels[-1]:
+        raise ExhibitFail(
+            f"TEST FAIL: CURRENT_COMPARISON {current!r} is not the "
+            f"lineage tail {labels[-1]!r}"
+        )
+    return lineage[-1]
+
+
+def write_cross_system_current(cur_rec: list[dict], *, entry: tuple) -> str:
+    """The current-comparison alias (cross-system-current.md).
+
+    Lineage header plus the current E0→E4 table and ratios, computed
+    from the pin CURRENT_COMPARISON names. The shape checks here are
+    deliberately independent of the per-campaign validators: if the
+    constant is advanced to a pin whose CSVs are missing or whose
+    batch set / arm counts do not match the lineage entry, this
+    writer fails closed instead of serving an empty or
+    half-populated table.
+    """
+    label, rev, batches, sha_prefix, n_per_arm, exhibit = entry
+    got_batches = {r["batch_id"] for r in cur_rec}
+    if got_batches != set(batches):
+        raise ExhibitFail(
+            f"TEST FAIL: current comparison {label} batch_id set "
+            f"{sorted(got_batches)} does not match the lineage entry "
+            f"{sorted(batches)}"
+        )
+    shas = {r["git_sha"] for r in cur_rec}
+    if len(shas) != 1:
+        raise ExhibitFail(
+            f"TEST FAIL: current comparison {label} mixed git_sha "
+            f"{sorted(shas)}"
+        )
+    sha = next(iter(shas))
+    if not sha.startswith(sha_prefix):
+        raise ExhibitFail(
+            f"TEST FAIL: current comparison {label} git_sha {sha} "
+            f"does not start with {sha_prefix}"
+        )
+    for field in ("e0_to_e4_ns", "d_fin_ns"):
+        if any(field not in r for r in cur_rec):
+            raise ExhibitFail(
+                f"TEST FAIL: current comparison {label} runs.csv "
+                f"missing {field}"
+            )
+    for _sys, cfg in T48_ARM_ORDER:
+        rows = [r for r in cur_rec if r["config"] == cfg]
+        if len(rows) != n_per_arm:
+            raise ExhibitFail(
+                f"TEST FAIL: current comparison {label} {cfg} has "
+                f"{len(rows)} recorded trials, want {n_per_arm}"
+            )
+    e4 = {
+        cfg: cfg_median(cur_rec, cfg, "e0_to_e4_ns")
+        for _sys, cfg in T48_ARM_ORDER
+    }
+
+    def short(r: str) -> str:
+        return r if len(r) <= 12 else r[:12]
+
+    lineage_str = " → ".join(
+        f"{lab} (`{short(rv)}`)" for lab, rv, *_ in COMPARISON_LINEAGE
+    )
+    links = ", ".join(
+        f"[{lab}]({ex})" for lab, _rv, _b, _s, _n, ex in COMPARISON_LINEAGE
+    )
+    batches_str = " / ".join(f"`{b}`" for b in sorted(batches))
+    lines = [
+        "<!-- generated by scripts/report-exhibits.py — do not edit -->",
+        "",
+        f"**Current comparison: {label}.** The report's prose cites "
+        'this file wherever it means "the comparison"; a specific '
+        "campaign's exhibit is cited only where that campaign is "
+        "discussed as history. Advancing a campaign moves "
+        "`CURRENT_COMPARISON` in `scripts/report-exhibits.py` and "
+        "regenerates this file.",
+        "",
+        f"Campaign lineage: {lineage_str}. Each campaign's full "
+        f"exhibit stays frozen under its own pin: {links}.",
+        "",
+        f"Source: `git show {rev}:results/{{runs,phases}}.csv` "
+        f"(batches {batches_str}, measured kernel `{sha_prefix}`, "
+        f"n={n_per_arm} recorded per arm, warmup excluded). "
+        "**RISC-V under QEMU TCG software emulation.** Working-tree "
+        "CSVs are not read. Regeneration: `just report-exhibits`.",
+        "",
+        "### Comparison (E0→E4)",
+        "",
+        "| system | config | n | E0→E4 median | IQR | min | D_fin median |",
+        "|---|---|---:|---:|---:|---:|---:|",
+    ]
+    for sysname, cfg in T48_ARM_ORDER:
+        rows = [r for r in cur_rec if r["config"] == cfg]
+        e4s = [float(r["e0_to_e4_ns"]) for r in rows]
+        dfins = [float(r["d_fin_ns"]) for r in rows]
+        med, iq, mn = stat(e4s)
+        dmed = statistics.median(dfins)
+        lines.append(
+            f"| {sysname} | {cfg} | {len(rows)} | {fmt_ns(med)} | "
+            f"{fmt_ns(iq)} | {fmt_ns(mn)} | {fmt_ns(dmed)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "Ratios are E0→E4 medians under TCG; the emulation "
+            "penalty applies to both arms (KVM-comparability caveat "
+            "in the T4.8 exhibit, unchanged):",
+            "",
+            f"- `release-fast-boot` / `trimmed` = "
+            f"**{fmt_ratio(e4['trimmed'], e4[FAST])}**",
+            f"- `release-fast-boot` / `stock` = "
+            f"**{fmt_ratio(e4['stock'], e4[FAST])}**",
+            "",
+            "Detail — the before/after against the previous "
+            "campaign, the E0→first-connect control, trim and "
+            "observer cost, and the serial-regime note — lives in "
+            f"the frozen campaign exhibit: [{exhibit}]({exhibit}).",
             "",
         ]
     )
@@ -3781,6 +4076,157 @@ def cmd_selftest() -> int:
         "validate_t47 planted t47c/t47b pair",
     )
 
+    # --- T4.4 bump exhibit (write_t44_bump) ---
+    def t44_run(cfg: str, batch: str, trial: str) -> dict:
+        return {
+            "batch_id": batch,
+            "trial": trial,
+            "warmup": "0",
+            "config": cfg,
+            "e0_to_e4_ns": "2000",
+        }
+
+    def t44_phase_row(
+        cfg: str, batch: str, trial: str, phase: str
+    ) -> dict:
+        return {
+            "batch_id": batch,
+            "trial": trial,
+            "warmup": "0",
+            "config": cfg,
+            "phase": phase,
+            "delta_ns": "100",
+            "ns_since_e2": "1000",
+        }
+
+    t44_fix_phases = (
+        "frame_init", "accounting", "page_verify", "E3g", "freeze",
+    )
+    t44_fix_rec = [
+        t44_run(cfg, b, "1")
+        for cfg in (FAST, SAFE)
+        for b in ("y-1", "y-2")
+    ]
+    t44_fix_ph = [
+        t44_phase_row(cfg, b, "1", ph)
+        for cfg in (FAST, SAFE)
+        for b in ("y-1", "y-2")
+        for ph in t44_fix_phases
+    ]
+    write_t44_bump(t44_fix_rec, t44_fix_ph, t44_fix_rec, t44_fix_ph)
+    fired.append("write_t44_bump accepts a clean fixture")
+    t44_no_frame = [p for p in t44_fix_ph if p["phase"] != "frame_init"]
+    expect_fail(
+        lambda: write_t44_bump(
+            t44_fix_rec, t44_no_frame, t44_fix_rec, t44_fix_ph
+        ),
+        "no recorded frame_init rows",
+        "t44 missing phase rows",
+    )
+    t44_no_e3g = [p for p in t44_fix_ph if p["phase"] != "E3g"]
+    expect_fail(
+        lambda: write_t44_bump(
+            t44_fix_rec, t44_no_e3g, t44_fix_rec, t44_fix_ph
+        ),
+        "no E2→E3g values",
+        "t44 missing E3g",
+    )
+
+    # --- current-comparison alias (cross-system-current.md) ---
+    cur_entry = current_comparison_entry()
+    if cur_entry[0] != CURRENT_COMPARISON:
+        raise ExhibitFail(
+            "TEST FAIL: current_comparison_entry resolved wrong label"
+        )
+    fired.append("current_comparison_entry resolves the lineage tail")
+    expect_fail(
+        lambda: current_comparison_entry(current="T4.9z"),
+        "not in lineage",
+        "alias unknown CURRENT_COMPARISON",
+    )
+    expect_fail(
+        lambda: current_comparison_entry(current="T4.8"),
+        "not the lineage tail",
+        "alias history-as-current",
+    )
+
+    def alias_run(cfg: str, sysname: str, batch: str) -> dict:
+        return {
+            "batch_id": batch,
+            "warmup": "0",
+            "system": sysname,
+            "config": cfg,
+            "git_sha": "cafe1234deadbeef",
+            "e0_to_e4_ns": "1000",
+            "d_fin_ns": "10",
+        }
+
+    alias_entry = (
+        "T4.Xf",
+        "fixture-rev",
+        frozenset({"x-1", "x-2"}),
+        "cafe1234",
+        2,
+        "cross-system-fixture.md",
+    )
+    alias_rec = [
+        alias_run(cfg, sysname, batch)
+        for sysname, cfg in T48_ARM_ORDER
+        for batch in ("x-1", "x-2")
+    ]
+    write_cross_system_current(alias_rec, entry=alias_entry)
+    fired.append("write_cross_system_current accepts a clean fixture")
+    moved_batch = [
+        dict(r, batch_id="x-3" if r["batch_id"] == "x-2" else r["batch_id"])
+        for r in alias_rec
+    ]
+    expect_fail(
+        lambda: write_cross_system_current(moved_batch, entry=alias_entry),
+        "does not match the lineage entry",
+        "alias batch-set mismatch",
+    )
+    half = [
+        r
+        for r in alias_rec
+        if not (r["config"] == "stock" and r["batch_id"] == "x-2")
+    ]
+    expect_fail(
+        lambda: write_cross_system_current(half, entry=alias_entry),
+        "recorded trials, want",
+        "alias half-populated arm",
+    )
+    no_dfin = [dict(r) for r in alias_rec]
+    for r in no_dfin:
+        del r["d_fin_ns"]
+    expect_fail(
+        lambda: write_cross_system_current(no_dfin, entry=alias_entry),
+        "missing d_fin_ns",
+        "alias missing field",
+    )
+    mixed_sha_alias = [dict(r) for r in alias_rec]
+    mixed_sha_alias[0]["git_sha"] = "beef9999deadbeef"
+    expect_fail(
+        lambda: write_cross_system_current(mixed_sha_alias, entry=alias_entry),
+        "mixed git_sha",
+        "alias mixed sha",
+    )
+    expect_fail(
+        lambda: write_cross_system_current(
+            [dict(r, git_sha="beef9999deadbeef") for r in alias_rec],
+            entry=alias_entry,
+        ),
+        "does not start with",
+        "alias sha-prefix",
+    )
+    expect_fail(
+        lambda: read_csv_text(
+            git_show("no-such-pin", "results/runs.csv"),
+            "no-such-pin:results/runs.csv",
+        ),
+        "git show",
+        "alias missing-CSV pin (git_show fails closed)",
+    )
+
     print("TEST PASS: report-exhibits fail-closed selftest")
     for line in fired:
         print(f"  fired: {line}")
@@ -3864,6 +4310,9 @@ def main() -> int:
             f"{T47_REV}:results/phases.csv",
         )
         validate_t47(t47_runs, t47_phases)
+        t44_rec, t44_phases = load_pin(
+            T44_REV, T44_BATCHES, T44_SHA_PREFIX, "T4.4"
+        )
         base_rec = recorded(base_runs)
         after_rec = recorded(after_runs)
         t48_rec = recorded(t48_runs)
@@ -3877,6 +4326,7 @@ def main() -> int:
                 base_rec, after_rec, baseline_summary, t48_rec=t48_rec
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "phase-decomposition.md").write_text(
             write_phase_table(
@@ -3887,6 +4337,7 @@ def main() -> int:
                 e2e3g_after_fast,
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "edges.md").write_text(
             write_edges(
@@ -3898,22 +4349,31 @@ def main() -> int:
                 t48_phases=t48_phases,
             ),
             encoding="utf-8",
+            newline="\n",
+        )
+        (OUT_DIR / "t44-bump.md").write_text(
+            write_t44_bump(t44_rec, t44_phases, base_rec, base_phases),
+            encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "dump-placement.md").write_text(
             write_dump_placement(),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "cross-system.md").write_text(
             write_cross_system(
                 t48_rec, t48_phases, after_rec, after_phases
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "cross-system-t48b.md").write_text(
             write_cross_system_t48b(
                 t48b_rec, t48b_phases, t48_rec, t48_phases
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "cross-system-t48c.md").write_text(
             write_cross_system_t48c(
@@ -3924,6 +4384,17 @@ def main() -> int:
                 manifest_text=t48c_manifest,
             ),
             encoding="utf-8",
+            newline="\n",
+        )
+        cur_entry = current_comparison_entry()
+        cur_runs = read_csv_text(
+            git_show(cur_entry[1], "results/runs.csv"),
+            f"{cur_entry[1]}:results/runs.csv",
+        )
+        (OUT_DIR / "cross-system-current.md").write_text(
+            write_cross_system_current(recorded(cur_runs), entry=cur_entry),
+            encoding="utf-8",
+            newline="\n",
         )
         linux_serial = git_show(SERIAL_REV, LINUX_SERIAL_PATH)
         whim_serial = git_show(SERIAL_REV, WHIMBREL_SERIAL_PATH)
@@ -3939,23 +4410,28 @@ def main() -> int:
                 manifest_text,
             ),
             encoding="utf-8",
+            newline="\n",
         )
         (OUT_DIR / "t47-firmware.md").write_text(
             write_t47_firmware(t47_rec, t47_phases),
             encoding="utf-8",
+            newline="\n",
         )
         print(
             f"TEST PASS: exhibits from {BASELINE_TAG} + {AFTER_REV} + "
+            f"{T44_REV} + "
             f"{T48_REV[:12]} + {T48B_REV} + {T48C_REV} + {SERIAL_REV[:12]} + "
             f"{LABEL_REV[:12]} + {T47_REV[:12]} → {OUT_DIR}"
         )
         print((OUT_DIR / "machine-spec.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "phase-decomposition.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "edges.md").read_text(encoding="utf-8"))
+        print((OUT_DIR / "t44-bump.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "dump-placement.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "cross-system.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "cross-system-t48b.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "cross-system-t48c.md").read_text(encoding="utf-8"))
+        print((OUT_DIR / "cross-system-current.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "linux-decomposition.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "t47-firmware.md").read_text(encoding="utf-8"))
         return 0
@@ -3965,6 +4441,14 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # Exhibit bytes and console output are a function of the pinned
+    # inputs, never of the invoking machine's locale (DEBUGGING.md:
+    # "Regenerated exhibits all show modified, with mangled
+    # characters").
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     if sys.argv[1:] == ["selftest"]:
         try:
             sys.exit(cmd_selftest())

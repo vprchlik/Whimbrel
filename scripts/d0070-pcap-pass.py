@@ -90,7 +90,7 @@ def git_show(rev: str, path: str) -> str:
         ["git", "show", f"{rev}:{path}"],
         cwd=ROOT,
         capture_output=True,
-        text=True,
+        encoding="utf-8",
     )
     if proc.returncode != 0:
         err = proc.stderr.strip() or proc.stdout.strip() or "git show failed"
@@ -692,7 +692,7 @@ def main() -> int:
             return cmd_selftest()
         md = run_pass()
         OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-        OUT_PATH.write_text(md, encoding="utf-8")
+        OUT_PATH.write_text(md, encoding="utf-8", newline="\n")
         sys.stdout.write(md)
         return 0
     except PassFail as e:

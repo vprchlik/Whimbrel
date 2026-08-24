@@ -1,27 +1,39 @@
 # Floor-finding: boot to first HTTP byte on a RISC-V unikernel
 
 Draft-early skeleton (T4.3 / D-0064; T4.4 and T4.6 ladder rows
-filled; T4.8 cross-system and Linux decomposition filled). Every quantitative claim in
+filled; T4.8→T4.8c cross-system, T4.7 firmware, and Linux
+decomposition filled). Every quantitative claim in
 Results is generated from CSV by `scripts/report-exhibits.py`.
 Regeneration: `just report-exhibits`. Do not type table cells.
 
 The harness overwrites `results/runs.csv` and `results/phases.csv` per
 run. The exhibit generator therefore reads git objects, not the
 working tree: **baseline columns** from tag `baseline-t4.3` (measured
-kernel `35861f3`), **after-ladder and Δ** from the T4.6 superpage CSV
+kernel `35861f3`), **T4.4** from tag `t44` (measured kernel
+`83ca9f9`), **after-ladder and Δ** from the T4.6 superpage CSV
 commit (measured kernel `76830e13`), **D-0068 dump-placement** from
-that commit plus the two yield-then-dump CSV commits, **T4.8
-cross-system** from `ffb7ac7` (measured kernel `1005399`, batches
-`20260818T073023Z-1` / `20260818T073023Z-2`), **Linux decomposition**
-from the T4.8 serial pin `d705ecb` (batch-1 trial 4). See
+that commit plus the two yield-then-dump CSV commits,
+**cross-system** from `ffb7ac7` (T4.8, measured kernel `1005399`),
+tag `t48b` (T4.8b, `06687e2`), and tag `t48c` (T4.8c, `1c8816e`)
+— the current comparison is the generated alias
+[exhibits/cross-system-current.md](exhibits/cross-system-current.md)
+— **T4.7 firmware** from `c2759e2` (measured kernel `346f4c1`),
+**Linux decomposition** from the T4.8 serial pin `d705ecb`
+(batch-1 trial 4) plus the D-0072 label pin `93ab617`, and the
+**regime witness** from every campaign's pinned CSVs
+(`scripts/regime-witness.py`). See
 [exhibits/phase-decomposition.md](exhibits/phase-decomposition.md)
-caption and D-0067. `HEAD` may hold a later batch; it is not
-the after-ladder pin. T4.8 Linux decomposition pins stay
-`d705ecb` + `93ab617` after D-0073; T4.8b is a new pin, not a
-retarget.
+caption and D-0067. `HEAD` may hold a later batch; it is never a
+pin. Campaign pins are frozen at their campaign: T4.8's stay
+`ffb7ac7` + `d705ecb` + `93ab617`; each later campaign is a new
+pin, not a retarget.
 
-Conditions, stated once: QEMU TCG, `virt` machine, `-bios default`,
-slirp as the TCP peer, dedicated Ubuntu 26.04 host, boost off. Not
+Conditions, stated once: QEMU TCG, `virt` machine, slirp as the
+TCP peer, dedicated Ubuntu 26.04 host, boost off. `-bios default`
+(OpenSBI) on every comparison campaign; the T4.7 firmware exhibit
+([exhibits/t47-firmware.md](exhibits/t47-firmware.md)) is the one
+place a second lane replaces OpenSBI with the D-0079 M-mode shim
+in the `-bios` slot, and it states its own conditions. Not
 hardware time.
 
 ---
@@ -35,20 +47,42 @@ E2→E3g median of the fast-boot configuration reported in
 profile is flat: no phase exceeds 19% of 6.43 ms. The T4.3 freeze
 had been two walks of the frame free list; T4.4 collapsed those;
 T4.6 mixed-granularity paging took the next 42%. Safe vs fast is
-still a large factor. T4.8 fills the Linux row: on RISC-V under
-QEMU TCG software emulation, same host, fast-boot E0→E4 is 14.5×
-the trimmed Linux baseline and 18.1× stock
-([exhibits/cross-system.md](exhibits/cross-system.md)). Unikraft
-is empty until T4.9. The honest E0→E4 number counts QEMU startup,
-guest boot wait, and sub-ms delivery once each (D-0070/D-0071);
-E3w→E4 is retired.
+still a large factor. T4.8c fills the Linux row: on RISC-V under
+QEMU TCG software emulation, same host, trimmed Linux takes 5.1×
+fast-boot's E0→E4 and stock 17.8×
+([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
+The honest E0→E4 number counts QEMU startup, guest boot wait, and
+sub-ms delivery once each (D-0070/D-0071); E3w→E4 is retired.
+*(T4.11: the rewrite states the T4.7 firmware result here —
+replacing OpenSBI with the D-0079 shim, −23.69 ms per batch, the
+largest single E0→E4 change —
+[exhibits/t47-firmware.md](exhibits/t47-firmware.md).)*
+
+A three-way comparison including Unikraft was attempted and ended
+at a pre-registered no-go, not a schedule limit (D-0063). At the
+pinned riscv64 port — unikraft/unikraft PR #1698, head `e9b1d549`
+— no networked build can boot: the port's PLIC driver registers no
+`fdt_xlat` operation, the generic interrupt layer asserts on that
+NULL pointer while probing virtio-mmio transports, and QEMU's
+`virt` machine always presents those transports, so the crash
+lands during bus probing, before `main`. The fix is roughly
+fifteen lines of new Unikraft driver code, which the spike's
+no-core-patches rule forbids: the measurement would then describe
+our fork, not Unikraft. This is a regression in the port's 2026
+rebase, not an absence of riscv64 support. The quantitative
+comparison is therefore two-way against Linux; Unikraft appears as
+a qualitative boot-path analysis from source at the same pin
+(Results). A Unikraft build on another ISA was available and
+deliberately not run: a cross-ISA number cannot share the
+same-host, same-QEMU conditions that make the Linux ratios
+meaningful.
 
 ---
 
 ## Background
 
 *(stub)* Whimbrel is a single-hart, single-address-space rv64gc
-unikernel: OpenSBI, Sv39, one U-mode app, five syscalls, virtio-net,
+unikernel: OpenSBI, Sv39, one U-mode app, seven syscalls, virtio-net,
 HTTP/1.0 one-shot. Built to be explained, then measured. Related
 work (unikernels, TCG vs silicon, boot-time literature) belongs here
 at T4.11, not as a literature dump that outruns the apparatus.
@@ -80,8 +114,11 @@ attributed delta. Statistics: median and IQR; min shown as the
 observed floor bound; means never. Stability: two interleaved
 30-trial batches, per-metric medians within max(2%, 200 µs) for
 every metric ≥ 1 ms. The criterion passed on this host for both
-configs on the freeze, T4.4, T4.6, and both D-0068 invocations, and
-for all five arms of T4.8; it
+configs on the freeze, T4.4, T4.6, and both D-0068 invocations,
+and for all five arms of each of T4.8, T4.8b, and T4.8c (the
+later two ran the T4.8 gate set — "gates as T4.8"); T4.7's
+pooled Claim A is stability-gated by construction, and its E0→E4
+claim is per-batch by design. The criterion
 failed on the KVM pod, so that pod's numbers are not cited here.
 
 **Reproducibility beyond interleaved batches.** D-0055's stability
@@ -93,19 +130,24 @@ reproducing is a stronger claim than one campaign splitting, and
 the generated figure is inside max(2%, 200 µs) on every compared
 median.
 
-**T4.8 campaign shape.** The five-arm run interleaved two Whimbrel
-profiles with three Linux arms (trimmed, stock, trimmed-instrumented),
-two shuffled batches, steal 0 on all 300 recorded trials, stability
-PASS on every arm. Whimbrel's own guest number held:
-`release-fast-boot` E2→E3g is 6.43 ms in that campaign, matching
-the T4.6 after-ladder pin (Δ +550 ns;
-[exhibits/cross-system.md](exhibits/cross-system.md)). That is
-reproducibility across a different campaign shape — three extra
-systems in the shuffle — not a new rung. Host-observed T4.8
-Whimbrel edges (new schema: E0→E4, W, D_fin, D_ack, no E3w) are
-the T4.8 section of [exhibits/edges.md](exhibits/edges.md).
-The Linux guest decomposition is the T4.8 instrumented serial
-plus D-0072 labels of the same Image
+**Cross-system campaign shape.** Each five-arm campaign (T4.8,
+T4.8b, T4.8c) interleaved two Whimbrel profiles with three Linux
+arms (trimmed, stock, trimmed-instrumented), two shuffled batches,
+steal 0 on all 300 recorded trials, stability PASS on every arm.
+Whimbrel's own guest number held across the whole lineage:
+`release-fast-boot` E2→E3g is 6.43 ms at T4.8 — matching the T4.6
+after-ladder pin (Δ +550 ns;
+[exhibits/cross-system.md](exhibits/cross-system.md)) — then
+6.38 ms at T4.8b (Δ −51.0 µs on the same kernel) and 6.38 ms at
+T4.8c (Δ −2.9 µs;
+[exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
+That is reproducibility across campaign shape and two Linux-side
+changes the Whimbrel arms do not carry — not a new rung.
+Host-observed T4.8 Whimbrel edges (new schema: E0→E4, W, D_fin,
+D_ack, no E3w) are the T4.8 section of
+[exhibits/edges.md](exhibits/edges.md). The Linux guest
+decomposition is the T4.8 instrumented serial plus D-0072 labels
+of the same (pre-FTRACE) Image
 ([exhibits/linux-decomposition.md](exhibits/linux-decomposition.md)),
 not a sixth arm.
 
@@ -117,8 +159,10 @@ into [exhibits/machine-spec.md](exhibits/machine-spec.md) by
 `just report-exhibits`.
 
 **T4.4.** Batches `20260817T052349Z-1` and `20260817T052349Z-2`,
-measured kernel `83ca9f9`. Kept as the pre-superpage pin; not the
-after-ladder columns.
+measured kernel `83ca9f9`, sourced from
+`git show t44:results/{runs,phases}.csv` into
+[exhibits/t44-bump.md](exhibits/t44-bump.md). Kept as the
+pre-superpage pin; not the after-ladder columns.
 
 **T4.6 after-ladder (superpages).** Batches `20260817T061753Z-1`
 and `20260817T061753Z-2`, measured kernel `76830e13`, sourced from
@@ -143,8 +187,8 @@ E3w→E4 is therefore the time from the HTTP frame appearing in the
 filter-dump to Python `recv` — slirp/hostfwd + host TCP + client
 read, plus any QEMU occupancy after the guest has already published
 (D-0066). It is the largest term in honest E0→E4 after T4.4. The
-same QEMU user-net and the same client are used for Linux and
-Unikraft, so the shared conduit does not by itself distort
+same QEMU user-net and the same client are used for the Linux
+arms, so the shared conduit does not by itself distort
 comparisons.
 
 **Linear scaling is the wrong model for small phases.**
@@ -180,9 +224,12 @@ and the main loop that pumps slirp are host state that guest work
 writes as a side effect of existing. T4.4 and T4.6 are a matched
 pair. After T4.4 stopped linking ~31k free-list nodes (~125 MiB),
 later phases ran against a warmer data cache and TLB: `page_verify`
-−7%, `E3g` −13%. After T4.6 deleted the 32k-iteration verify loop,
-`freeze` — which the rung does not call — went 7.3 → 12.2 µs (+67%)
-because the next instructions met a colder TCG translation cache.
+−7%, `E3g` −13% ([exhibits/t44-bump.md](exhibits/t44-bump.md)).
+After T4.6 deleted the 32k-iteration verify loop, `freeze` — which
+the rung does not call — went 7.3 µs (the T4.4 value, same exhibit;
+the baseline pin's 7.5 µs is a different campaign, not a conflict)
+→ 12.2 µs (+67%) because the next instructions met a colder TCG
+translation cache.
 Same cause, opposite signs. Both deltas are sub-instrumentation-noise
 in absolute terms (stamp overhead is ~5.5 µs on fast-boot; the
 `freeze` extra is ~5 µs). They are not second hypotheses and not
@@ -201,8 +248,15 @@ open — see Results.
 
 Exhibit tables: [phase decomposition](exhibits/phase-decomposition.md)
 (D-0064 centerpiece columns), [edges](exhibits/edges.md),
-[dump placement](exhibits/dump-placement.md), and
-[cross-system](exhibits/cross-system.md).
+[T4.4 bump](exhibits/t44-bump.md),
+[dump placement](exhibits/dump-placement.md),
+[cross-system-current](exhibits/cross-system-current.md) (the
+current comparison), the frozen campaign exhibits
+[cross-system](exhibits/cross-system.md) (T4.8),
+[T4.8b](exhibits/cross-system-t48b.md), and
+[T4.8c](exhibits/cross-system-t48c.md),
+[T4.7 firmware](exhibits/t47-firmware.md), and the
+[regime witness](exhibits/regime-witness.md).
 
 ---
 
@@ -248,7 +302,9 @@ flagship number.
 ### T4.4 prediction outcome
 
 Pre-registered against `baseline-t4.3` in D-0065 before the
-dedicated-host rerun. Mechanism and magnitude were correct. The
+dedicated-host rerun; the actual column is generated in
+[exhibits/t44-bump.md](exhibits/t44-bump.md). Mechanism and
+magnitude were correct. The
 headline arithmetic beat the ~9.5 ms projection. Three tight leftover
 bounds were missed. Every falsification line (≥ 1 ms, or a third
 phase vanishing) held. Point estimates on those leftovers were
@@ -264,8 +320,10 @@ the audit recorded as finding 10 (`task_init` / `virtq_init` /
 | safe `freeze` | < 50 µs | 100.0 µs | bound missed; still collapsed from 4.88 ms |
 | unnamed phase vanishes | would falsify | none vanished | held |
 
-Headline edges, generated: fast E2→E3g 21.42 → 9.17 ms (−57%);
-fast E0→E4 67.05 → 54.52 ms; safe E2→E3g 94.88 → 78.25 ms.
+Headline edges, generated in
+[exhibits/t44-bump.md](exhibits/t44-bump.md): fast E2→E3g
+21.42 → 9.17 ms (−57%); fast E0→E4 67.05 → 54.52 ms; safe E2→E3g
+94.88 → 78.25 ms.
 
 Two unnamed phases moved without vanishing, so they do not falsify.
 `page_verify` 2.57 → 2.39 ms (−7%). `E3g` 1.42 → 1.24 ms (−13% in
@@ -295,8 +353,8 @@ Headline edges: fast E2→E3g 9.17 → 6.43 ms (−30%); cumulative from
 Arithmetic remainder if only paging moved: 9.17 − 2.72 = 6.45 ms;
 actual 6.43 ms.
 
-`freeze` 7.3 → 12.2 µs is the cold-translation half of the matched
-TCG pair in Methodology. Linear-vs-measured `page_verify` (~40 µs
+`freeze` 7.3 µs (T4.4 pin) → 12.2 µs is the cold-translation half
+of the matched TCG pair in Methodology. Linear-vs-measured `page_verify` (~40 µs
 extrapolated, 731 µs measured, ~75 ns/leaf over ~32k becoming
 ~1.3 µs/leaf over ~580) is the D-0069 worked example there.
 
@@ -391,9 +449,10 @@ listen backlog the moment `listen()` exists — and the main loop
 going live, when slirp first services the queued connection and
 emits the ARP that starts `W`'s clock. A one-clock mechanism check
 (polling filter-dump's incremental pcap writes against the client's
-own stamps) closed the accounting per boot to +0.05…+0.32 ms, and a
-late-connect control showed slirp forwards an accepted connection's
-SYN in 60–160 µs once startup is over. So the former "E3w→E4"
+own stamps; recorded in D-0071, not an exhibit) closed the
+accounting per boot to +0.05…+0.32 ms, and a late-connect control
+(same record) showed slirp forwards an accepted connection's SYN
+in 60–160 µs once startup is over. So the former "E3w→E4"
 decomposes with nothing left over: **QEMU startup (~6.8 ms) +
 waiting for our own guest to boot (`W`) + sub-millisecond delivery
 (`D_fin`)** — the first two already counted once, correctly, in
@@ -404,7 +463,8 @@ reported as `D_fin`.
 
 | rung | hypothesis | E2→E3g after | Δ vs `baseline-t4.3` | disposition |
 |---|---|---|---|---|
-| bump / lazy free-list | stop linking ~31k virgin frames; `free_count()` is bump arithmetic | 9.17 ms | −12.25 ms (−57%) | landed T4.4 (D-0065); batches `20260817T052349Z-1`/`-2`; subsumes D-0060. Secondary: later phases faster (warm data cache; matched pair) |
+| bump / lazy free-list | stop linking ~31k virgin frames; `free_count()` is bump arithmetic | 9.17 ms | −12.25 ms (−57%) | landed T4.4 (D-0065); pin `t44`, batches `20260817T052349Z-1`/`-2`
+([exhibits/t44-bump.md](exhibits/t44-bump.md)); subsumes D-0060. Secondary: later phases faster (warm data cache; matched pair) |
 | D-0060 allocated counter | `free_count = TOTAL − allocated` on the current list | — | — | declined-by-subsumption |
 | 2 MiB superpages (D-0059) | mixed-granularity identity map; level-aware verifier; grain-aware `assert_range` | 6.43 ms | −15.00 ms (−70% vs freeze); −2.74 ms (−30% vs T4.4) | **landed T4.6**; batches `20260817T061753Z-1`/`-2`; `tables_used`=5; paging 3.84 → 1.12 ms. Phase ranges over (D-0069); E2→E3g in range. Secondary: `freeze` slower (cold I-translation; matched pair) |
 | `virtq_init` skip discarded program+verify | first pass wiped by `net::init` reset; `fill_descriptors` stays | — | 842 µs = 13% of 6.43 ms; 5% bar is 322 µs | **eligible, not next.** Ceiling on the gain. Linux takes the honest number |
@@ -439,22 +499,26 @@ rungs:
 
 By D-0058's letter the ladder is not closed: `virtq_init` still
 clears 5% of E2→E3g. D-0068 was the next *action* and has been
-measured: it did not move E0→E4. Linux is next. Fast E0→E4 is
-51.66 ms on the T4.6 batches; skipping the discarded virtqueue
-pass is ~0.8 ms of that (1.6%). virtq_init stays
+measured: it did not move E0→E4. The Linux campaigns have since
+run (T4.8 → T4.8b → T4.8c), and T4.7 measured the firmware
+window — not a rung: it changes the boot contract (see "Firmware
+removal" below). Fast E0→E4 is
+51.66 ms on the T4.6 after-ladder pin; skipping the discarded
+virtqueue pass is ~0.8 ms of that (1.6%). virtq_init stays
 recorded-eligible. The floor is not declared. The former ~31 ms
 "E3w→E4" of that 52 ms is resolved: QEMU startup + guest boot
 wait + sub-ms delivery (D-0070/D-0071), each counted once in
 E0→E4 — there is no separate host term to take.
 
-Leaf-count estimate from T4.4 exhaust `total=31823` → `__heap_end`
-≈ `0x803B1000`: 62 × 2 MiB leaves on `0x80400000..0x88000000`;
-~520 4 KiB leaves for `0x80200000..0x80400000` plus the virtio
-window; `tables_used` 67 → 5 (landed).
+Leaf-count derivation — arithmetic from the T4.4 exhaust line,
+not a measurement: `total=31823` → `__heap_end` ≈ `0x803B1000`;
+62 × 2 MiB leaves on `0x80400000..0x88000000`; ~520 4 KiB leaves
+for `0x80200000..0x80400000` plus the virtio window;
+`tables_used` 67 → 5 (landed; a code-verified constant).
 
 The pre-registered ranges, kept as the prediction record:
 
-| metric | now | projected range | falsify if |
+| metric | T4.4 | projected range | falsify if |
 |---|---|---|---|
 | `page_verify` | 2.39 ms | 80–400 µs if grain-correct; 1.5–2.2 ms if still 4 KiB-stepping (failed co-edit) | ≥ 1.0 ms (walk did not shrink) or < 30 µs (something else dropped) |
 | `page_build` | 1.45 ms | 50–300 µs | ≥ 0.8 ms |
@@ -471,64 +535,130 @@ Co-edit checklist, walked in the same change:
 justfile virtio probe greps (row format unchanged, greps did not
 move); DEBUGGING.md superpage first-response note.
 
+### Firmware removal (T4.7 / D-0079)
+
+Not a ladder rung: the D-0079 M-mode shim changes the boot
+contract — a second lane in the `-bios` slot — rather than
+removing guest work under the same contract, so it is a labeled
+per-system result beside the ladder, not a row in it. All numbers:
+[exhibits/t47-firmware.md](exhibits/t47-firmware.md) (pin
+`c2759e2`, four Whimbrel arms, two firmware lanes, one batch set,
+n=60 per arm).
+
+Replacing OpenSBI with the shim cuts fast-boot
+spawn-to-first-HTTP-byte from 52.27 / 52.19 ms to
+28.58 / 28.50 ms per batch (ΔE0→E4 −23.691 / −23.689 ms, 1.8×).
+The exhibit's two claims are different kinds of number and stay
+separate: **Claim A**, the pooled guest-side change, is ΔE2→E3g
+**−0.714 ms** (stability-gated; 6.40 → 5.69 ms); **Claim B**,
+ΔE0→E4, is reported per batch and never pooled, because the
+quantity being removed — the OpenSBI-side firmware window — is
+volatile across campaigns. The decomposition is three terms, not
+one firmware number: guest firmware execution removed
+(−22.972 / −22.984 ms per batch), ΔS — host-side firmware load —
+at −0.002 ms, and the −0.714 ms seam envelope. The seams are
+itemised inside that envelope from D-0079's registered set
+(replaced-SBI call sites or in-window print): `stvec` −222.1 µs,
+`frame_init` −74.1 µs, `E3g` −517.5 µs.
+
+The cross-system comparison uses the OpenSBI lane, not this one.
+That is D-0079's measurement framing, restating D-0061: variant,
+never replacement — `-bios default` keeps every gate and every
+primary number, the cross-system table's Whimbrel rows stay
+OpenSBI, and a registered falsifier makes any movement of the
+`-bios default` cross-system rows a stop. Linux structurally
+cannot take this rung — no Linux row can swap its firmware for a
+purpose-built M-mode shim — and that asymmetry is the finding,
+reported as a labeled per-system result rather than folded into
+the ratio. Two boundaries carry over: the shim lane's console is
+polled S-mode UART, so safe-profile numbers never compare across
+lanes (the comparison profile is fast-boot, zero in-window
+bytes), and the shim lane's S is profile-dependent — an open
+D-0079 item with no consumer.
+
 ### Cross-system
 
-Generated from `ffb7ac7` (batches `20260818T073023Z-1` /
-`20260818T073023Z-2`, n=60 recorded per arm):
-[exhibits/cross-system.md](exhibits/cross-system.md). No E3w-derived
-column. W is not next to a Linux row. E0→first-connect is a control
-(medians 18.78–18.83 ms, span 56.3 µs). Pre-registered gates held:
-no SYN-grid failure, no RST, first-connect bound, trimmed-vs-stock
-tripwire did not fire. Linux `trimmed` W is 718.53 ms with a 2.95 ms
-IQR — smooth, not snapped to a 1 s grid — so confound A's announce
-mitigation did what it was registered to do.
+Three campaigns, one lineage: T4.8 (`ffb7ac7`) → T4.8b (`t48b`,
+the D-0073 FTRACE sweep and D-0075 `/init`) → T4.8c (`t48c`, the
+D-0081 cmdline token). Each is frozen under its own pin; the
+current comparison is
+[exhibits/cross-system-current.md](exhibits/cross-system-current.md),
+and the campaign exhibits carry the before/after at each seam.
+Table rules, unchanged across the lineage: no E3w-derived column;
+W is never next to a Linux row; E0→first-connect is a same-QEMU
+control (T4.8c medians 18.54–18.64 ms, span 100.3 µs, bound
+1 ms). Pre-registered gates held on every campaign: no SYN-grid
+failure, no RST, first-connect bound, trimmed-vs-stock tripwire
+silent. The confound-A evidence is T4.8's: Linux `trimmed` W was
+718.53 ms with a 2.95 ms IQR — smooth, not snapped to a 1 s grid
+— so the announce mitigation did what it was registered to do;
+that check belongs to the campaign that introduced it and is not
+re-litigated per seam.
 
 On RISC-V under QEMU TCG software emulation, same host, same QEMU,
-`release-fast-boot` reaches first HTTP byte 14.5× faster than
-trimmed Linux and 18.1× faster than stock
-([exhibits/cross-system.md](exhibits/cross-system.md)). Published
-unikernel figures (2–3 ms) and Firecracker's ~125 ms Linux boot are
-x86 with KVM hardware virtualization, where absolute times run
-roughly 5–10× lower. Those absolute numbers are not comparable to
-52.28 ms or 759.79 ms; the ratio is, because the emulation penalty
-applies to both arms on the same host.
+`release-fast-boot` reaches first HTTP byte 5.1× faster than
+trimmed Linux and 17.8× faster than stock
+([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
+Published unikernel figures (2–3 ms) and Firecracker's ~125 ms
+Linux boot are x86 with KVM hardware virtualization, where
+absolute times run roughly 5–10× lower. Those absolute numbers are
+not comparable to 51.95 ms or 263.75 ms; the ratio is, because the
+emulation penalty applies to both arms on the same host.
 
 Instrumentation cost is measured, not caveated:
-trimmed-instrumented − trimmed = 23.70 ms for
+trimmed-instrumented − trimmed = 23.66 ms for
 `loglevel=7 printk.time=1 initcall_debug` on the same
-`Image-trimmed` binary (identical `kernel_sha256`).
+`Image-trimmed` binary (identical `kernel_sha256`). The cell
+contains in-window console output, so it is day-scoped (D-0078)
+and holds within the T4.8c campaign, not across campaigns.
 
-S is reported per system, never pooled across systems. D-0071
-pools Whimbrel safe and fast because S is profile-independent on
-one ELF (`s_ns_fast=6.87 ms`, `s_ns_safe=6.98 ms` in this
-campaign's batch header — the ~6.8 ms constant of
-[exhibits/d0070-pcap.md](exhibits/d0070-pcap.md)). A five-arm pool
-is 13.51 ms with a 7.95 ms IQR, dragged by Linux's 20.8 MB Image
-(that load lands in S, D-0062). The wide IQR is two populations,
-not noise.
+S — the pre-guest QEMU-startup slice — is reported per system,
+never pooled across systems. D-0071 pools Whimbrel safe and fast
+on the OpenSBI lane because S is profile-independent on one ELF
+(the ~6.8 ms constant of
+[exhibits/d0070-pcap.md](exhibits/d0070-pcap.md); the T4.7 shim
+lane recorded a profile-dependent S, an open D-0079 item with no
+consumer — [exhibits/t47-firmware.md](exhibits/t47-firmware.md)).
+Pooling S across systems would mix populations: image load lands
+in S (D-0062), and D-0082 brackets the Linux-side cost at roughly
+6–13 ms (trimmed) and 10–20 ms (stock) of E0→E4 that Whimbrel
+does not pay — a disclosed Linux-side component in both current
+cross-system exhibits, a unikernel property rather than a
+retraction of the ratio. A cross-system S pool's wide spread is
+two populations, not noise.
 
 This is floor-finding, not a trophy. The result is what a
 single-purpose VM's structure buys under those stated conditions.
-Whimbrel's guest work in this campaign is E2→E3g 6.43 ms; the
+Whimbrel's guest work in this campaign is E2→E3g 6.38 ms; the
 phase decomposition
 ([exhibits/phase-decomposition.md](exhibits/phase-decomposition.md))
 shows where that interval goes. No "fastest" without its conditions
 attached.
 
 The trimmed row's good-faith claim is now backed by measurement: it
-beats stock by 188.32 ms, so the trim removed real work rather than
+beats stock by 659.96 ms, so the trim removed real work rather than
 hobbling Linux. The published config is
 `bench/linux/linux-trimmed.fragment` on `qemu_riscv64_virt_defconfig`
 (Buildroot 2026.02.3, kernel 6.18.7). A Linux boot-time specialist
 could likely do better — we claim *a* minimal Linux, not *the*
 minimal Linux (D-0062). The D-0072 labels named one miss: `FTRACE`
-defaults y from `DEBUG_KERNEL`, the fragment never unsets it, and
-`trace_eval_sync` is 68% of the 327 ms hole. That is the T4.8
-Image. D-0073 acts on the miss (`# CONFIG_FTRACE is not set` plus
-the printk leftovers); T4.8b is the after. The T4.8 exhibit stays
-the before — a diagnostic pass named a cost, we removed it, and
-the campaign will show what it bought. Do not treat 222.6 ms as a
-quiet-row saving (D-0069); the pre-registered range is 540–740 ms.
+defaults y from `DEBUG_KERNEL`, the T4.8 fragment never unset it,
+and `trace_eval_sync` labeled 68% of the 327 ms hole. D-0073 acted
+on the miss (`# CONFIG_FTRACE is not set` plus the printk
+leftovers); T4.8b measured it. Trimmed E0→E4 fell 759.79 →
+284.68 ms (−475.10 ms) against the pre-registered 540–740 ms
+orientation range — **below the low end**; no falsifier fired
+([exhibits/cross-system-t48b.md](exhibits/cross-system-t48b.md)).
+Per D-0069 the miss is stated with its direction: the sweep
+removed more quiet-row work than the UART-inflated diagnostic
+could bound — the expected direction, at a magnitude the range
+did not allow for. The 222.6 ms label was a name for the hole,
+never a quiet-row prediction; the measured saving was 475.10 ms.
+The T4.8 exhibit stays the before. D-0081 then skipped the
+RISC-V unaligned-access probe via a cmdline token on every Linux
+arm (trimmed −20.94 ms, stock −24.40 ms); the current trimmed
+row is 263.75 ms
+([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
 
 ### Linux boot decomposition
 
@@ -572,6 +702,19 @@ Printk `Run /init` → shutdown = 43.31 ms = 9.45 + 26.18 + 7.68.
 Unmeasured prefix: 63 untimed OpenSBI lines, then 39 kernel lines
 at `0.000000` until `sched_clock` at 38 µs. No E2 constructed.
 
+### Unikraft: boot-path analysis at the pin
+
+*(stub — write at T4.11 from D-0063's Outcome; fallback (3),
+selected 2026-08-23; the referent of the abstract's Unikraft
+paragraph)* Source-level riscv64 analysis at unikraft/unikraft
+PR #1698 head `e9b1d549`: the no-go trace (NULL `fdt_xlat`,
+assert during virtio-mmio bus probing, crash before `main`);
+regression from #461, not absent riscv64 support; what looked
+right and what was not verified; the cross-ISA build available
+and deliberately not run, and why. Qualitative only — no
+quantitative claims, and nothing here ever shares a table with
+measured numbers.
+
 ---
 
 ## Threats to validity
@@ -583,8 +726,11 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
    page-table build) and MMIO-dense phases (virtio) are taxed
    differently than on silicon. Every claim carries "under QEMU TCG".
 2. **slirp is the TCP peer**, not a wire. E3w−E3g prices virtio+slirp.
-   True hostfwd delivery plus client recv is bounded by `D_fin` at
-   63–155 µs ([exhibits/d0070-pcap.md](exhibits/d0070-pcap.md)).
+   True hostfwd delivery plus client recv is sub-millisecond on
+   every measured row: `D_fin` 63–155 µs across the Whimbrel D-0070
+   campaigns ([exhibits/d0070-pcap.md](exhibits/d0070-pcap.md)) and
+   ≤ ~0.3 ms on every T4.8c arm
+   ([exhibits/cross-system-t48c.md](exhibits/cross-system-t48c.md)).
    The former "E3w→E4" is retired: QEMU startup (D-0071) plus the
    accepted connection waiting for the guest to boot (D-0070),
    mislabeled by E3w's anchoring construction.
@@ -605,9 +751,9 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
 7. **Debug-era history is not evidence.** Regeneration from CSV;
    appendix [appendix-regenerate.md](appendix-regenerate.md).
 8. **Linux-tuning fairness** (D-0062) — measured: trimmed beats
-   stock by 188.32 ms
-   ([exhibits/cross-system.md](exhibits/cross-system.md)), so the
-   trim removed real work. Config published:
+   stock by 659.96 ms
+   ([exhibits/cross-system-current.md](exhibits/cross-system-current.md)),
+   so the trim removed real work. Config published:
    `bench/linux/linux-trimmed.fragment`. A Linux boot-time
    specialist could likely do better; we claim *a* minimal Linux,
    not *the* minimal Linux. On the T4.8 Image, `FTRACE` is a
@@ -647,6 +793,9 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
    `DEBUG_FS`, `FB`, `VT`, `PINCTRL`, `I2C`, `SPI`, `THERMAL`,
    `CPU_IDLE` (named deferred: no-boot risk or idle path).
 9. **Unikraft pin** (D-0063) — stated when that row exists.
+   *(T4.11: reword — under fallback (3), selected 2026-08-23, no
+   row will ever exist; state the pin unconditionally in the
+   Results Unikraft section and point this item at it.)*
 10. **Instrumentation observer effect.** Stamp overhead is a generated
     row in [exhibits/edges.md](exhibits/edges.md) (5.5 µs on
     fast-boot). `print_after_response` is a second observer. D-0068
@@ -656,9 +805,10 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     stays on principle. The null was later explained: there was no
     post-publish host work for it to move (D-0070).
 11. **Host variance.** Dedicated native host, performance governor,
-    SMT off, boost off, steal 0 on all recorded trials of the freeze,
-    T4.4, T4.6, both D-0068 invocations, and T4.8 (300 recorded), two
-    interleaved batches
+    SMT off, boost off, steal 0 on all recorded trials of every
+    published campaign — the freeze, T4.4, T4.6, both D-0068
+    invocations, T4.8/T4.8b/T4.8c (300 recorded each), and T4.7
+    (240 recorded) — with two interleaved batches
     that met max(2%, 200 µs). D-0068 additionally reproduced across
     two independent campaigns. The KVM pod failed the criterion and
     is not cited.
@@ -699,8 +849,8 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     occupancy surface is guest work after a guest-side stamp moving
     a host-observed edge. D-0068 tested the PHASE dump as that
     occupant: two N-trials, no E4 movement. The dump stays off the
-    interval on principle. Linux and Unikraft share slirp/hostfwd;
-    they will not share a PHASE dump. If measured runs stopped
+    interval on principle. The Linux arms share slirp/hostfwd;
+    they do not share a PHASE dump. If measured runs stopped
     printing PHASE, the decomposition and E0→E4 would come from
     different boots — that would be its own line.
 17. **A derived metric double-counted guest boot under a
@@ -778,7 +928,9 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     `neigh` retransmit from 1 s to 50 ms via one `RTM_SETNEIGHTBL`
     before the announce. That call is on the measured path and
     inflates the Linux baseline by a measured **2.87 ms** (`T_NEIGH`
-    stamp; ~1.5% of the 188 ms cross-system delta) — a bias toward
+    stamp; ~0.4% of the 659.96 ms trim delta — a smaller share than
+    T4.8's ~1.5% only because the denominator grew; the 2.87 ms
+    itself is unchanged) — a bias toward
     Whimbrel, applied identically to stock and trimmed so the trim
     comparison is unaffected. An earlier "sub-millisecond" estimate
     was wrong by 3x, which is why the cost is stamped rather than
@@ -799,36 +951,63 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     `guest_arp_req_n` make any recurrence countable rather than
     fatal.
 
-21. **Serial-byte cost is a time-varying host state** (D-0078). With
-    kernel, QEMU, argv and pins byte-identical, the guest serial path
-    stepped from ~5.8 to ~6.8 µs/byte between T4.8 and T4.8b; the
-    canary's first uses then showed the state flips on a minutes
-    timescale, with campaigns internally uniform. Every safe-profile
-    phase grew in proportion to the bytes it prints (~1.0 µs/byte),
-    `frame_init`'s tick-anchored wait absorbed it, and a same-day
-    two-shell A/B exonerated the launcher. Exposed: safe-profile
-    deltas, its `W`/E0→E4 (+15.8 ms between the tables — the
-    campaign's serial regime, not a regression), the
-    instrumented−trimmed observer cost, and safe/fast pooling across
-    campaigns. Not exposed: the headline — `release-fast-boot` prints
-    nothing in its window (52.28 → 51.87 ms), Linux quiet rows print
-    ~6 bytes, and `stock` moved 948.11 → 948.10 ms across campaigns,
-    the parity control that excludes general host drift. The
-    stability gate cannot catch this: it compares within a campaign,
-    and the state was uniform within each. The per-campaign canary
-    boot (D-0078, implemented) records the starting regime in the
-    batch header; a mid-campaign flip stays checkable at trial grain
-    from the safe arm's own deltas.
+21. **Serial-byte cost is a campaign-scoped host regime** (D-0078
+    and its amendment;
+    [exhibits/regime-witness.md](exhibits/regime-witness.md)). With
+    kernel, QEMU, argv and pins byte-identical, the guest serial
+    path stepped from ~5.8 to ~6.8 µs/byte between T4.8 and T4.8b.
+    Every safe-profile phase grew in proportion to the bytes it
+    prints (~1.0 µs/byte), `frame_init`'s tick-anchored wait
+    absorbed it, and a same-day two-shell A/B exonerated the
+    launcher. The recorded witness — the safe arm's per-trial
+    `page_verify` — divides into two clusters at ~14 ms, and every
+    recorded campaign is internally uniform: T4.8 and both D-0068
+    invocations deflated, T4.8b inflated, T4.8c deflated (its
+    canary columns). An earlier reading — the canary's first uses
+    showing the state flipping on a minutes timescale — is refuted
+    by the warmup-position join: the disagreeing canaries and the
+    batch-boundary first safe warmups land in one structural
+    deflated cluster (11.78–12.11 ms), lane-independent, host-side
+    of the polled UART — a position effect, not a mid-run flip.
+    The same evidence demotes the canary from certificate to
+    component: it disagreed with the recorded witness twice (t47b,
+    t47c), so a campaign's regime is the canary joined with the
+    recorded witness within one kernel family, never the canary
+    alone. Exposed: safe-profile deltas and its `W`/E0→E4
+    (+15.8 ms between the T4.8 and T4.8b tables — the campaign's
+    serial regime, not a regression), the instrumented−trimmed
+    observer cost (day-scoped per campaign), and pooling safe
+    numbers across campaigns whose regimes differ — T4.8b and
+    T4.8c's canaries disagree, so per D-0078 those safe rows do
+    not compare. Not exposed: the headline — `release-fast-boot`
+    prints nothing in its window (52.28 → 51.87 → 51.95 ms across
+    the three campaigns), and Linux quiet rows print ~6 bytes.
+    `stock` was the parity control at the T4.8→T4.8b seam
+    (948.11 → 948.10 ms); at the T4.8c seam it moves by design
+    (D-0081), and drift control passes to `release-fast-boot` plus
+    the campaign canary. The stability gate cannot catch this: it
+    compares within a campaign, and the regime is uniform within
+    each; a mid-campaign flip would remain visible at trial grain
+    in the safe arm's own witness, and none has been observed.
 
 ---
 
 ## Future work
 
-Unikraft spike (D-0063). `virtq_init` remains eligible at 13% of
+Unikraft: the spike is concluded (D-0063; no-go at the pin,
+fallback (3) selected 2026-08-23). *(T4.11: write the successor
+future-work item — the one route back to (1) that D-0063's
+Standing notes: the `fdt_xlat` stub fixed upstream in the PR
+branch itself, then a re-pin to that head.)* `virtq_init`
+remains eligible at 13% of
 6.43 ms and is not the next action. D-0060 is
-declined-by-subsumption. `-bios none` (D-0061). T4.3b audit
-cleanup. T4.8b (D-0073) is the FTRACE act-on, spec'd, not yet
-run on the bench host; the T4.8 exhibit stays the before.
+declined-by-subsumption. `-bios none` (D-0061) is concluded via
+the D-0079 M-mode shim, measured at T4.7 (−23.69 ms per batch,
+[exhibits/t47-firmware.md](exhibits/t47-firmware.md)); the shim
+lane's profile-dependent S stays an open D-0079 item with no
+consumer. T4.3b audit
+cleanup. T4.8b (D-0073) and T4.8c (D-0081) have run; the T4.8
+exhibit stays the before.
 
 ---
 
@@ -838,9 +1017,15 @@ run on the bench host; the T4.8 exhibit stays the before.
   findings 16–23).
 - [Phase decomposition exhibit](exhibits/phase-decomposition.md)
 - [Edges exhibit](exhibits/edges.md)
+- [T4.4 bump exhibit](exhibits/t44-bump.md)
 - [Dump placement exhibit](exhibits/dump-placement.md)
 - [Cross-system exhibit](exhibits/cross-system.md)
 - [Cross-system T4.8b exhibit](exhibits/cross-system-t48b.md)
+- [Cross-system T4.8c exhibit](exhibits/cross-system-t48c.md)
+- [Current comparison](exhibits/cross-system-current.md) — alias
+  following `CURRENT_COMPARISON`; campaign exhibits stay frozen
+- [T4.7 firmware-removal exhibit](exhibits/t47-firmware.md)
+- [Regime-witness exhibit](exhibits/regime-witness.md)
 - [Linux boot decomposition](exhibits/linux-decomposition.md)
 - [D-0070 pcap pass exhibit](exhibits/d0070-pcap.md) (generated on
   the bench host; committed from there)

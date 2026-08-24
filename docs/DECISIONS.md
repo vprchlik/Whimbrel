@@ -2644,7 +2644,7 @@ D-0011 onward are working decisions made under those constraints.
 ## D-0063: Unikraft spike — go/no-go and the no-core-patches line
 - Date: 2026-08-16 — Status: accepted (pin recorded 2026-08-22; go
   criteria **not met** at the pin, abandon line held — see Outcome;
-  the (2)-vs-(3) fallback choice is a separate, pending decision)
+  fallback (3) selected 2026-08-23 — see Fallback choice)
 - **Decision:** pin the unikraft/unikraft PR #1698 branch commit and the
   kraftkit version in this entry when the spike starts. **Go** = the
   HTTP example builds for qemu/riscv64 at the pin, boots on our pinned
@@ -2809,6 +2809,32 @@ D-0011 onward are working decisions made under those constraints.
   decision. The one route back to (1) that does not cross the line is
   the stub being fixed in the PR branch itself and the spike re-pinning
   to that head; it is noted, not planned.
+- **Fallback choice (2026-08-23): (3) selected** — two-way
+  quantitative plus a qualitative Unikraft section from source,
+  stated in the abstract, not a footnote. Against (2): its
+  quantitative half is a Unikraft number on arm64 or x86_64 that, by
+  this entry's own rule, never shares a table with riscv64 numbers —
+  a build, a campaign, and an exhibit spent producing a figure the
+  reader is then told not to compare with anything else in the
+  report. The substrate-comparability discipline that makes the
+  Linux ratios meaningful — same host, same pinned QEMU, the
+  emulation penalty applying to both arms — is exactly what a
+  cross-ISA row cannot have. (2)'s qualitative half is the part with
+  value, and it is already done: the trace in this entry's Outcome
+  is the source-level riscv64 boot-path analysis (2) asked for, so
+  (3) keeps everything of (2) that survives scrutiny and drops only
+  the incomparable number. Recorded explicitly so the absence is a
+  stated methodological choice, not a gap a reader must guess about:
+  a cross-ISA build was available at the pin (qemu/x86_64 or
+  qemu/arm64, where Unikraft is routinely built and `c-http` is a
+  catalog example) and was deliberately not run, for the reason
+  above. Consequences: the comparison section converges in shape (3)
+  — the D-0064 gate's "selected fallback shape"; the abstract states
+  it in its opening paragraphs per this entry's Consequences; the
+  qualitative section lives in Results beside the Linux boot
+  decomposition, stubbed in the draft now and written at T4.11 from
+  this entry's Outcome. T4.9's acceptance (section exists in the
+  draft) stays open until the stub is written.
 
 ## D-0064: Report structure, claims discipline, convergence, audits
 - Date: 2026-08-16 — Status: accepted
