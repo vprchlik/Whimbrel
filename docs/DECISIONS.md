@@ -6293,6 +6293,27 @@ D-0011 onward are working decisions made under those constraints.
   the typed copy in this entry was wrong. Nothing structural stops
   this recurring: the generators are gated; a hand-typed number in
   an entry is not. That is why entries quote exhibits.
+- **F8 — falsifier 3 on the shim gate path (2026-08-24).** The
+  registered wording was "any serial of any trial or gate." The
+  computed scan added before t47c covered campaign trial serials
+  and the canary only. The only gate that boots the shim is
+  `just test-m`, via two `boot-test.sh` invocations with
+  `QEMU_BIOS` set to the blob. `boot-test.sh` now calls
+  `python3 scripts/bench.py scan-mtrap` after QEMU, only when
+  `QEMU_BIOS` is set and not `default`, on every exit path that
+  has a log **including 124**. A hit is `TEST FAIL` (falsifier 3),
+  not `TEST HANG`. That ordering is the actual catch: `_mshim_mtrap`
+  parks in `wfi`, so QEMU never stores to sifive_test and the
+  timeout returns 124; a scan that ran only on PASS (including
+  `check-serial`) could never see the diagnostic. OpenSBI gates
+  are not scanned — they cannot print `M!`. The scanner CLI is
+  planted in `bench-selftest` and `just test-mtrap-planted` (file
+  fixture, no QEMU). **The gate integration is desk-checked only
+  until a trapping shim boot is run on the bench host;** this
+  machine has no QEMU. Campaign `run_trial` still reads serial
+  after the HTTP client checks, and a parked shim hits the QEMU
+  timeout raise before either — not a one-line reorder, not
+  changed here.
 - Revisit trigger: any falsifier; QEMU moving the `virt` FDT or
   reset address (checkpoint 0 and the `check_dtb` assert both catch
   it loudly); or the seams demanding a change outside D-0061's

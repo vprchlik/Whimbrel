@@ -775,6 +775,31 @@ test-m:
     fi
     echo 'TEST PASS: test-m — boot, net, HTTP, fast-release under the M-mode shim'
 
+# Scanner-level plant for D-0079 falsifier 3 (no QEMU). Proves
+# `bench.py scan-mtrap` rejects a fixture containing M!. Does not prove
+# boot-test.sh calls it on a 124 — that needs a trapping shim boot on
+# the bench host and is desk-checked until then.
+test-mtrap-planted:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp=$(mktemp)
+    printf 'ZPDCTVM\nM! 0000000000000009 ffffffff80208bba 0000000000000000\n' > "$tmp"
+    set +e
+    out=$(python3 scripts/bench.py scan-mtrap "$tmp" 2>&1)
+    st=$?
+    set -e
+    rm -f "$tmp"
+    echo "$out"
+    if [ "$st" -eq 0 ]; then
+        echo 'TEST FAIL: planted M! was accepted by scan-mtrap'
+        exit 1
+    fi
+    if ! echo "$out" | grep -q 'falsifier 3'; then
+        echo 'TEST FAIL: scan-mtrap failed but not as falsifier 3'
+        exit 1
+    fi
+    echo 'TEST PASS: planted M! rejected as falsifier 3'
+
 # T4.1 / D-0055: N=30 recorded + 3 warmup per config, two interleaved
 # batches (configs mixed, recorded trial order shuffled). Writes
 # results/runs.csv, results/phases.csv, results/summary.txt.

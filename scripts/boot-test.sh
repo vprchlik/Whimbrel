@@ -18,6 +18,12 @@ set -euo pipefail
 # Default / HTTP / UDP / fast-boot have no watcher. Panic/hang never
 # print DRIVER_OK. CLIENT_EARLY=1 starts the HTTP retry loop before E0
 # (D-0043); otherwise curl waits for HTTP READY (correctness gate).
+#
+# D-0079 falsifier 3: when QEMU_BIOS is a blob (the M-mode shim), scan
+# serial for `M!` after QEMU and before classifying 124 as HANG. The
+# shim's mtvec handler parks in wfi, so a real M-mode trap never
+# PASSes; a PASS-only scan cannot catch it. OpenSBI gates do not set
+# QEMU_BIOS and are not scanned (they cannot print the diagnostic).
 
 EXPECT="${EXPECT:-M3 UNIKERNEL OK}"
 TIMEOUT_S="${TIMEOUT_S:-5}"
@@ -151,6 +157,16 @@ if [ -n "$hpid" ]; then
     wait "$hpid" 2>/dev/null
 fi
 set -e
+
+# Shim lane only. A hit is falsifier 3 (exit 1), including when
+# timeout returned 124 — not TEST HANG.
+if [ -n "${QEMU_BIOS:-}" ] && [ "${QEMU_BIOS}" != "default" ]; then
+    if [ ! -f serial.log ]; then
+        echo "TEST FAIL: serial log missing under shim bios (falsifier 3 cannot be checked)"
+        exit 1
+    fi
+    python3 scripts/bench.py scan-mtrap serial.log
+fi
 
 if grep -a -q 'PANIC' serial.log; then
     echo 'TEST FAIL: panic'

@@ -2180,6 +2180,20 @@ def cmd_summarize(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_scan_mtrap(args: argparse.Namespace) -> int:
+    """D-0079 falsifier 3 over a serial file. Used by boot-test.sh on
+    the shim lane, including the 124/HANG path. check-serial does not
+    call this — that path is PASS-only and would never see M!.
+    """
+    path = Path(args.serial)
+    if not path.is_file():
+        raise BenchFail(f"TEST FAIL: serial log missing: {path}")
+    text = path.read_bytes().decode("utf-8", errors="replace")
+    falsifier3_scan(text)
+    print("TEST PASS: no M-mode trap diagnostic in serial")
+    return 0
+
+
 def cmd_check_serial(args: argparse.Namespace) -> int:
     path = Path(args.serial)
     if not path.is_file():
@@ -2430,6 +2444,32 @@ def cmd_selftest(_args: argparse.Namespace) -> int:
         if "falsifier 1" not in str(e):
             raise
         fired.append(f"check-serial D-0081 plant: {e}")
+    mtrap_log = tmp / "mtrap.serial"
+    mtrap_log.write_text(
+        "ZPDCTVM\nM! 0000000000000009 ffffffff80208bba 0000000000000000\n",
+        encoding="utf-8",
+    )
+    try:
+        cmd_scan_mtrap(argparse.Namespace(serial=str(mtrap_log)))
+        raise BenchFail("scan-mtrap plant did not fire")
+    except BenchFail as e:
+        if "falsifier 3" not in str(e):
+            raise
+        fired.append(f"scan-mtrap plant: {e}")
+    mtrap_clean = tmp / "mtrap-clean.serial"
+    mtrap_clean.write_text("PHASE E3g ok\nHTTP OK\n", encoding="utf-8")
+    cmd_scan_mtrap(argparse.Namespace(serial=str(mtrap_clean)))
+    fired.append("scan-mtrap clean serial passes")
+    mtrap_missing = tmp / "no-such-mtrap.serial"
+    if mtrap_missing.exists():
+        mtrap_missing.unlink()
+    try:
+        cmd_scan_mtrap(argparse.Namespace(serial=str(mtrap_missing)))
+        raise BenchFail("scan-mtrap missing file did not fire")
+    except BenchFail as e:
+        if "serial log missing" not in str(e):
+            raise
+        fired.append(f"scan-mtrap missing file: {e}")
     empty = tmp / "zero-runs.csv"
     write_csv(empty, RUNS_FIELDS, [])
     try:
@@ -3552,6 +3592,13 @@ def main() -> int:
     )
     sig.add_argument("runs")
     sig.set_defaults(func=cmd_arp_signature)
+
+    mtrap = sub.add_parser(
+        "scan-mtrap",
+        help="D-0079 falsifier 3: fail closed if serial contains M!",
+    )
+    mtrap.add_argument("serial")
+    mtrap.set_defaults(func=cmd_scan_mtrap)
 
     chk = sub.add_parser(
         "check-serial",
