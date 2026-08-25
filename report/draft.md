@@ -4,23 +4,27 @@
 
 ## Abstract
 
-*(stub — fill at T4.11)* Under QEMU TCG on a dedicated host, a
-minimal rv64gc unikernel reaches first HTTP byte in a measured
-E2→E3g median of the fast-boot configuration reported in
-[exhibits/edges.md](exhibits/edges.md). After T4.6 the kernel
-profile is flat: no phase exceeds 19% of 6.43 ms. The T4.3 freeze
-had been two walks of the frame free list; T4.4 collapsed those;
-T4.6 mixed-granularity paging took the next 42%. Safe vs fast is
-still a large factor. T4.8c fills the Linux row: on RISC-V under
-QEMU TCG software emulation, same host, trimmed Linux takes 5.1×
-fast-boot's E0→E4 and stock 17.8×
+Whimbrel is a from-scratch rv64gc unikernel that serves one HTTP
+response, built to measure how much of the time from virtual-machine
+spawn to first HTTP byte a single-purpose kernel must spend. On
+RISC-V under QEMU TCG software emulation, with no KVM, on the same
+host and QEMU for every arm, its fast-boot image
+(`release-fast-boot`) reaches first HTTP byte in 51.95 ms, 5.1×
+faster than a minimal Linux tuned in good faith (263.75 ms) and
+17.8× faster than a stock defconfig Linux (923.70 ms)
 ([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
-The honest E0→E4 number counts QEMU startup, guest boot wait, and
-sub-ms delivery once each (D-0070/D-0071); E3w→E4 is retired.
-*(T4.11: the rewrite states the T4.7 firmware result here —
-replacing OpenSBI with the D-0079 shim, −23.69 ms per batch, the
-largest single E0→E4 change —
-[exhibits/t47-firmware.md](exhibits/t47-firmware.md).)*
+Its guest work, first kernel instruction to the published response,
+is 6.38 ms at the T4.8c pin, with every phase attributed (Results).
+In a second lane, replacing OpenSBI with a 320-byte M-mode shim in
+the `-bios` slot cuts the fast-boot image's spawn-to-first-byte from
+52.27 / 52.19 ms to 28.58 / 28.50 ms per batch (−23.69 ms in each
+batch, 1.8×), of which −0.714 ms is guest work; the remainder is the
+removed firmware window, reported per batch and never pooled
+([exhibits/t47-firmware.md](exhibits/t47-firmware.md)). That lane is
+reported beside the comparison, because no Linux row can swap its
+firmware for a purpose-built shim. Campaigns were pre-registered
+with falsifiers, gates fail closed, and every number regenerates
+from pinned git objects.
 
 A three-way comparison including Unikraft was attempted and ended
 at a pre-registered no-go, not a schedule limit (D-0063). At the
@@ -1454,20 +1458,61 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
 
 ## Future work
 
-Unikraft: the spike is concluded (D-0063; no-go at the pin,
-fallback (3) selected 2026-08-23). *(T4.11: write the successor
-future-work item — the one route back to (1) that D-0063's
-Standing notes: the `fdt_xlat` stub fixed upstream in the PR
-branch itself, then a re-pin to that head.)* `virtq_init`
-remains eligible at 13% of
-6.43 ms and is not the next action. D-0060 is
-declined-by-subsumption. `-bios none` (D-0061) is concluded via
-the D-0079 M-mode shim, measured at T4.7 (−23.69 ms per batch,
-[exhibits/t47-firmware.md](exhibits/t47-firmware.md)); the shim
-lane's profile-dependent S stays an open D-0079 item with no
-consumer. T4.3b audit
-cleanup. T4.8b (D-0073) and T4.8c (D-0081) have run; the T4.8
-exhibit stays the before.
+`virtq_init`, the first virtqueue program-and-verify pass that the
+device reset in `net::init` wipes, stays eligible under D-0058:
+842 µs, 13% of the after-ladder E2→E3g
+([exhibits/phase-decomposition.md](exhibits/phase-decomposition.md)),
+above the 5% bar. The ladder closed with it declined as a stopping
+decision (D-0083): its ceiling gain of 0.84 ms is 1.6% of the
+51.95 ms fast-boot E0→E4 the comparison rests on, so landing it
+would not move the comparison claim. A reader who takes the rung
+measures against the T4.8c pin and adds a row.
+
+D-0010 asked for a syscall-latency exhibit: a `gettime`-bracketed
+hot loop on Whimbrel against Linux's trap path and its vDSO, the
+vDSO standing in for what a single-privilege unikernel gets (PLAN
+T4.10). D-0083 descoped it, together with QEMU maximum RSS and
+guest-reported free memory, since no published claim depends on
+them. The per-crossing price of the U/S boundary is therefore
+unmeasured (Architecture), D-0010's consequence that M4 report
+syscall latency as trap-based is not met, and Threats item 13 states
+the reservation without a working set. It is the first measurement
+to take if the boundary's cost becomes the question.
+
+The one route back to a three-way comparison that keeps the
+no-core-patches line is the `fdt_xlat` stub fixed upstream in the PR
+branch itself, then a re-pin to that head and the spike's go
+criteria run again (D-0063). It is noted, not planned.
+
+On the shim lane, S differs between profiles: the shim-safe arm's S
+sits below the shim-fast arm's, where the OpenSBI lane's two
+profiles agree (D-0079). It gates nothing and no published number
+reads it; the T4.7 claims use the fast pair. Explaining it takes a
+mechanism check of D-0071's kind on that lane's captures. It is an
+open D-0079 item with no consumer.
+
+D-0080 registered a characterization of E0-side drift, the
+batch-to-batch movement of first-connect that aborted t47b, and a
+decision on what D-0055's stability criterion does about it. Its
+first execution, on 2026-08-20, was an invalid run: the runner had
+no pacing, so the probe sampled at roughly 1000× its registered
+cadence and the session took about 30 s against a registered 35 to
+40 minutes, and its selftest could not fail on that. A redesign that
+enforces the cadence from recorded timestamps and refuses compressed
+timestamps in its selftest is drafted and not implemented; the run
+has not been repeated, and the question the entry was registered to
+answer is open (Threats).
+
+D-0083 added one column to the cross-system table without a
+campaign: image bytes, the bytes QEMU loads from the `-kernel` file
+(the sum of `PT_LOAD` sizes for Whimbrel's ELF, the file length for
+a Linux `Image`), from a committed record that measures each pinned
+artifact and verifies its sha256, with the generator failing closed
+on a missing size or a hash mismatch. At this draft it has not
+landed: the record, its script, and the column do not exist yet. It
+is the remaining bench-host task before sign-off, a measurement of
+files rather than a boot, and it puts a number beside the D-0082
+bracket for the image-size component of S.
 
 ---
 
