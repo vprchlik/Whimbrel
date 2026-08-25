@@ -45,11 +45,65 @@ meaningful.
 
 ## Background
 
-*(stub)* Whimbrel is a single-hart, single-address-space rv64gc
-unikernel: OpenSBI, Sv39, one U-mode app, seven syscalls, virtio-net,
-HTTP/1.0 one-shot. Built to be explained, then measured. Related
-work (unikernels, TCG vs silicon, boot-time literature) belongs here
-at T4.11, not as a literature dump that outruns the apparatus.
+A unikernel links one application with exactly the operating-system
+services it needs into one bootable image: no processes, no dynamic
+loading, no general-purpose userland. The claim made for that shape
+is that a machine which does one thing should reach that thing
+quickly. This report asks how quickly, and what the time is made of.
+Between the moment a virtual machine is spawned and the moment its
+first HTTP byte reaches a client, how much of the elapsed time is
+work a single-purpose kernel must do, how much is work it can still
+shed, and how much of what a general-purpose kernel does on the same
+path never needed doing? The answer is a floor in D-0064's sense,
+the minimum structurally necessary under stated conditions, bounded
+below by the phases argued necessary row by row, together with a
+ratio against a minimal Linux under the same conditions.
+
+Whimbrel exists to answer that question. It is a from-scratch rv64gc
+kernel in Rust, built to be explained and then measured (D-0001,
+D-0002): a hand-rolled network stack, so that each cost on the
+response path lands on a line the project wrote (D-0037); a kept U/S
+privilege boundary, so that the syscall cost a single-privilege
+unikernel would hide sits inside the measured interval (D-0010); and
+boot-path stamps whose own overhead is measured. The platform is
+QEMU's `virt` machine under TCG software emulation, chosen for a
+pinned binary, one machine shape, and instrumentation the guest
+cannot see; real boards were declined for bring-up variance
+(D-0003). Every number in the report is therefore emulated time, and
+the conditions travel with every claim.
+
+The comparison rests on conditions that hold for every arm at once.
+All systems boot on the same QEMU binary and machine shape, with the
+same user-mode network, the same host, and the same client. The
+edges that define the headline number are stamped by that client and
+need nothing from the guest: E0, the spawn, and E4, the first
+response byte. Every system serves the same 92-byte response over
+the same handshake. Arms are interleaved within one campaign, so
+host drift lands on all of them, and each campaign's gates are
+registered with their responses before it runs. The Linux side is a
+minimal Linux tuned in good faith, with its configuration published
+and a stock row beside it so that the tuning claim can be checked
+(D-0062). Guest-internal decompositions are per-system evidence
+taken with different instruments, and no cell of one is compared
+with a cell of the other.
+
+Under emulation the absolute times mean little outside these
+conditions. Published unikernel and microVM boot figures come from
+x86 under KVM hardware virtualization, and a TCG absolute compares
+with none of them. The ratio between arms is the comparable
+quantity, because the emulation penalty applies to both arms on the
+same host. A third arm, Unikraft, was attempted and ended at a
+pre-registered no-go at the pinned riscv64 port; it appears as a
+source-level analysis (Results), and no cross-ISA Unikraft number
+was taken, since it could not share the conditions that make the
+ratio meaningful (D-0063).
+
+The report's second subject is the measuring itself. Campaigns are
+pre-registered with falsifiers before they run, gates fail closed,
+and every published number regenerates from pinned git objects. The
+decision log keeps the misses beside the results, and the retired
+metric, the aborted campaign, and the refuted diagnoses are reported
+where they happened.
 
 ---
 
@@ -59,14 +113,14 @@ The apparatus is the kernel. It runs on QEMU's `virt` machine: one
 hart, rv64gc, entered in S-mode by OpenSBI (the T4.7 lane replaces
 OpenSBI with the D-0079 shim and is described with its exhibit) with
 the hart id and a device-tree pointer whose header is checked and
-whose contents are not parsed — the memory map is a set of named
+whose contents are not parsed; the memory map is a set of named
 constants cited to QEMU's `hw/riscv/virt.c` (D-0003, D-0012,
 D-0023). Paging is Sv39 with one root table for the life of the
 system; the kernel is identity-mapped with W^X, and the application
 shares that address space, separated from the kernel by the U bit
 (D-0005, D-0006). The application is one crate compiled into the
-image and linked into sections of its own — `.utext`, `.urodata`,
-`.udata`, `.ubss` — with a build check that every symbol those
+image and linked into sections of its own (`.utext`, `.urodata`,
+`.udata`, `.ubss`), with a build check that every symbol those
 sections reference resolves inside them (D-0044). It runs as the
 only U-mode task over seven syscalls: `write`, `exit`, `sbrk`,
 `gettime`, and `yield` from D-0010, `recv` and `send` from D-0040.
@@ -103,18 +157,18 @@ plus a recycled list for frames freed after allocation (D-0065). On
 the measured path the allocator serves page-table construction and
 nothing else.
 
-`task_init`. Four task slots — each an 8 KiB kernel stack, an 8 KiB
-user stack, a 64 KiB break window, and two 4 KiB guard holes — are
+`task_init`. Four task slots, each an 8 KiB kernel stack, an 8 KiB
+user stack, a 64 KiB break window, and two 4 KiB guard holes, are
 placed by the linker and populated without allocation (D-0030). The
 HTTP image fabricates a trap frame for each; slot 3 holds the
 application, and the other three are created and marked Exited. The
 count is a compile-time constant shared with the self-test images.
 
 `page_build`, `page_verify`, `activate`. The identity map uses 4 KiB
-leaves wherever it distinguishes anything at that grain — the
+leaves wherever it distinguishes anything at that grain (the
 kernel's W^X regions, guard holes, the user sections and task slots,
-the virtio-mmio window — and 2 MiB leaves for the aligned interior
-of RAM (D-0059); the production image needs five page tables.
+the virtio-mmio window) and 2 MiB leaves for the aligned interior of
+RAM (D-0059); the production image needs five page tables.
 `page_verify` is a second, independent software walk of the whole
 map that checks every leaf at its expected level, kept deliberately
 (D-0043). `satp` is written once, and no page-table entry is edited
@@ -125,18 +179,18 @@ range mapped during `page_build` and probed after activation
 (D-0039). The driver speaks modern virtio-mmio with split virtqueues
 of sixteen descriptors, negotiates `VIRTIO_F_VERSION_1` and
 `VIRTIO_NET_F_MAC` and declines every other feature, and points both
-rings at a static pool in `.bss` — sixteen 2 KiB receive buffers and
+rings at a static pool in `.bss`: sixteen 2 KiB receive buffers and
 eight transmit buffers, never freed or grown (D-0038). The rings are
 programmed and verified twice: once at `virtq_init`, and again after
 the device reset that opens `net::init` has wiped the first pass
 (audit finding 4; the row stays in the table).
 
-`first_rx`, `serving_ready`, `net_init_done`. Addressing is static —
+`first_rx`, `serving_ready`, `net_init_done`. Addressing is static:
 `10.0.2.15` behind gateway `10.0.2.2`, QEMU user-net's contract
 (D-0042). Init transmits an ARP request for the gateway and waits
 for the reply; `first_rx` is that reply arriving, and
 `serving_ready` is the cache entry it fills, which every later
-transmit uses — an empty entry at transmit time is a panic, not a
+transmit uses; an empty entry at transmit time is a panic, not a
 queue (D-0047, D-0054). A gratuitous ARP and a diagnostic ping of
 the gateway follow (`net_init_done`).
 
@@ -173,21 +227,22 @@ The usual unikernel shape runs the application and the kernel at one
 privilege level, so a system call is a function call, and it is
 faster. Whimbrel keeps the application in U-mode behind a trap-based
 interface (D-0010, D-0033): the syscall number travels in `a7`,
-arguments in `a0`–`a5`, and an error/value pair returns in `a0`/`a1`
-— the convention the kernel itself uses toward OpenSBI. Every user
-pointer is checked against the task's static intervals before use,
-and `sstatus.SUM` is raised only around a bounded copy inside the
-kernel (D-0034). A bad pointer, an unknown syscall number, or a
-U-mode fault kills the task; none of them panics the kernel.
+arguments in `a0`–`a5`, and an error/value pair returns in
+`a0`/`a1`, the convention the kernel itself uses toward OpenSBI.
+Every user pointer is checked against the task's static intervals
+before use, and `sstatus.SUM` is raised only around a bounded copy
+inside the kernel (D-0034). A bad pointer, an unknown syscall
+number, or a U-mode fault kills the task; none of them panics the
+kernel.
 
-That buys two things. The first is isolation that exists in hardware
-rather than by convention: the application cannot reach kernel
-memory, cannot touch the device or the rings, and is stopped by
-permission bits when it misbehaves (D-0006, D-0040). The second is a
-comparison that is not vacuous. The flagship interval contains a
-privilege transition of the same kind Linux pays on its own response
-path; a function-call "syscall" would leave nothing on Whimbrel's
-side for Linux's trap-and-return to be set against (D-0010).
+That buys two things. The first is isolation the hardware enforces:
+the application cannot reach kernel memory, cannot touch the device
+or the rings, and is stopped by permission bits when it misbehaves
+(D-0006, D-0040). The second is a comparison that is not vacuous.
+The flagship interval contains a privilege transition of the same
+kind Linux pays on its own response path; a function-call "syscall"
+would leave nothing on Whimbrel's side for Linux's trap-and-return
+to be set against (D-0010).
 
 It costs in three places. The phase table carries two as rows, both
 marked structurally necessary: `task_init`, the fabrication of the
@@ -203,8 +258,8 @@ Future work carries it.
 
 ### The TCP
 
-The stack is written from scratch — Ethernet, ARP, IPv4, ICMP echo,
-UDP echo, TCP — with no third-party stack and no TLS (D-0037). It
+The stack (Ethernet, ARP, IPv4, ICMP echo, UDP echo, TCP) is written
+from scratch, with no third-party stack and no TLS (D-0037). It
 serves one request over one connection, and then the application
 exits. The report claims nothing for it beyond that: no throughput,
 no robustness.
@@ -226,34 +281,33 @@ dropped; an out-of-order segment is dropped and the current ACK
 repeated; a SYN on a second four-tuple is dropped while a connection
 is live; the application may `send` once per connection.
 
-What it does not implement: congestion control of any kind — no
-window growth, no slow start, no loss-driven backoff; no
-retransmission-timer estimation — the RTO is a constant, not an RTT
-measurement; no reassembly — nothing out of order is buffered; no
-reading of the peer's advertised window; no window scaling,
-selective acknowledgment, or timestamps; no delayed ACK, persist
-timer, keep-alive, or urgent data; no active open; no full
-TIME_WAIT; no listen queue.
+What it does not implement: congestion control of any kind (no
+window growth, no slow start, no loss-driven backoff); no
+retransmission-timer estimation (the RTO is a constant); no
+reassembly (nothing out of order is buffered); no reading of the
+peer's advertised window; no window scaling, selective
+acknowledgment, or timestamps; no delayed ACK, persist timer,
+keep-alive, or urgent data; no active open; no full TIME_WAIT; no
+listen queue.
 
 At this workload none of that is reachable. The request is one
-segment — the bench client's `GET / HTTP/1.0` in campaigns, curl's
-in the gate. The response is 92 bytes: one segment, smaller than the
+segment: the bench client's `GET / HTTP/1.0` in campaigns, curl's in
+the gate. The response is 92 bytes: one segment, smaller than the
 536-byte default MSS and far inside the fixed window. With one
 segment in flight, stop-and-wait and a congestion window are the
 same policy. The peer is libslirp inside the QEMU process: a
 `hostfwd` connection is terminated on the host side and
 re-originated from the gateway, so the leg the guest's TCP talks
 over has no link to congest and delivers frames in the order slirp
-emits them (D-0042; Threats item 2). Curl's options — window
-scaling, SACK, timestamps — are negotiated with the host kernel and
-never reach the guest. A loss on the slirp leg would surface as a
-200 ms retransmission on serial and in the per-trial capture; the
-HTTP gates fail on one, and the timer's own behavior is exercised by
-a self-test image that withholds acknowledgments until one
+emits them (D-0042; Threats item 2). Curl's options (window scaling,
+SACK, timestamps) are negotiated with the host kernel and never
+reach the guest. A loss on the slirp leg would surface as a 200 ms
+retransmission on serial and in the per-trial capture; the HTTP
+gates fail on one, and the timer's own behavior is exercised by a
+self-test image that withholds acknowledgments until one
 retransmission has been captured (D-0053). The client opens one
 connection, so the dropped second SYN is never exercised in the
 measured protocol.
-
 ---
 
 ## Methodology
@@ -863,11 +917,11 @@ On RISC-V under QEMU TCG software emulation, same host, same QEMU,
 `release-fast-boot` reaches first HTTP byte 5.1× faster than
 trimmed Linux and 17.8× faster than stock
 ([exhibits/cross-system-current.md](exhibits/cross-system-current.md)).
-Published unikernel figures (2–3 ms) and Firecracker's ~125 ms
-Linux boot are x86 with KVM hardware virtualization, where
-absolute times run roughly 5–10× lower. Those absolute numbers are
-not comparable to 51.95 ms or 263.75 ms; the ratio is, because the
-emulation penalty applies to both arms on the same host.
+Published unikernel and microVM boot figures come from x86 under KVM
+hardware virtualization, and a TCG absolute such as 51.95 ms or
+263.75 ms compares with none of them; the ratio is the comparable
+quantity, because the emulation penalty applies to both arms on the
+same host.
 
 Instrumentation cost is measured, not caveated:
 trimmed-instrumented − trimmed = 23.66 ms for
@@ -998,11 +1052,10 @@ so the analysis describes the port's only riscv64 state to date.
 run.** The go criteria were evaluated against the source; what that
 leaves unverified is listed below.
 
-**The trace.** Two no-go criteria fired independently — the riscv64
+**The trace.** Two no-go criteria fired independently (the riscv64
 network path is nonfunctional, and the fix requires a patch to
-Unikraft internals — and the abandon line held rather than being
-crossed: no patch was written. Each step names a file so a reader
-can check it rather than trust it.
+Unikraft internals), and the abandon line held: no patch was
+written. Each step names a file a reader can check.
 
 1. `c-http` selects `LIBLWIP` → `LIBUKNETDEV` → `LIBVIRTIO_NET` →
    `LIBVIRTIO_BUS` (`drivers/virtio/bus/Config.uk`), which implies
@@ -1010,8 +1063,8 @@ can check it rather than trust it.
    `KVM_VMM_QEMU` (`plat/kvm/Config.uk`) selects both `HAVE_PCI` and
    `HAVE_MMIO` with no architecture condition.
 
-2. On the MMIO transport — Whimbrel's topology, `virtio-net-device`
-   — `LIBVIRTIO_MMIO` is not architecture-gated, and
+2. On the MMIO transport (Whimbrel's topology, `virtio-net-device`),
+   `LIBVIRTIO_MMIO` is not architecture-gated, and
    `LIBVIRTIO_MMIO_FDT` defaults on whenever `LIBFDT && LIBUKOFW`,
    which the PR selects for riscv64. The platform bus
    (`drivers/ukbus/platform/platform_bus.c`, `pf_probe_fdt`, near
@@ -1042,8 +1095,8 @@ can check it rather than trust it.
 
 5. The fix is a `plic_fdt_xlat` that reads the one-cell `interrupts`
    property (the PLIC's `#interrupt-cells = <1>`) plus a real
-   `configure_irq` — new code in a Unikraft driver, which is exactly
-   what the no-core-patches line forbids.
+   `configure_irq`: new code in a Unikraft driver, which the
+   no-core-patches line forbids.
 
 **Closed escape routes**, each with why it is closed. *PCI
 transport:* `drivers/ukbus/pci/Config.uk` has
@@ -1056,7 +1109,7 @@ fix (unikraft#804) and which needs the same `fdt_xlat` regardless.
 *Command-line devices:* `VIRTIO_MMIO_LINUX_COMPAT_CMDLINE` /
 `virtio_mmio.device=` exists in `drivers/virtio/mmio/Config.uk`, but
 `virtio_mmio.c` in this tree has no libparam references and
-`virtio_mmio_probe` has only the FDT branch — a Kconfig orphan.
+`virtio_mmio_probe` has only the FDT branch: a Kconfig orphan.
 *Disabling FDT probing:* `LIBVIRTIO_MMIO_FDT` is a promptless `bool`
 with `default y if (LIBFDT && LIBUKOFW)`, so it cannot be switched
 off from `.config`. *Stripping the `virtio,mmio` nodes:* that is a
@@ -1066,14 +1119,13 @@ and it would also remove the transport the NIC needs.
 **A regression, not an absence.** The original port, unikraft#461
 (2022), described PCI and MMIO probing as "virtually identical" to
 the ARM implementation and reported Redis, NGINX, SQLite and Python
-running — all of which need the network. The `uk_intctlr` driver-ops
+running, all of which need the network. The `uk_intctlr` driver-ops
 interface (`fdt_xlat`, `configure_irq`) postdates that port; the
 2026 rebase that is #1698 stubbed it (`plic.c` carries a "leave it
 alone at the moment, seems like just not used anymore" on
 `plic_ack_irq`), and the PR's own checklist lists no application and
-a QEMU 10.0.3 test, consistent with a hello-world port. The accurate
-statement is therefore not "Unikraft lacks riscv64" but "this rebase
-has not reconnected the interrupt path to device discovery".
+a QEMU 10.0.3 test, consistent with a hello-world port. This rebase
+has not reconnected the interrupt path to device discovery.
 
 **What looked right in the port**, read but not run: trap dispatch
 (`plat/kvm/riscv/traps.c`, `_trap_handler`: `SUPERVISOR_EXT` to
@@ -1095,27 +1147,25 @@ context-switch correctness (`arch/riscv/ctx.c`, `tls.c`); the timer
 under load; whether riscv64 nolibc is complete enough for lwip's
 build; and whether the port boots at all on the pinned QEMU 10.2.1,
 the author having tested 10.0.3. The trace above is a source-level
-argument that the networked configuration cannot boot at this pin,
-checkable file by file; the previous paragraph is an impression, not
-a verdict.
+argument, checkable file by file, that the networked configuration
+cannot boot at this pin; the list of what looked right carries no
+such weight.
 
-**The cross-ISA build, available and not run.** Fallback (2) — a
+**The cross-ISA build, available and not run.** Fallback (2), a
 Unikraft number on qemu/x86_64 or qemu/arm64, where `c-http` is a
-catalog example and the build was available at the pin — was
-declined deliberately (D-0063, 2026-08-23). By the spike's own rule
-such a number never shares a table with riscv64 numbers, so it would
-cost a build, a campaign, and an exhibit to produce a figure the
-reader is then told not to compare with anything else in this
-report. The discipline that makes the Linux ratios meaningful — same
-host, same pinned QEMU, the emulation penalty applied to both arms —
-is what a cross-ISA row cannot have. Everything of (2) that survives
-that scrutiny is the source-level analysis above; fallback (3) keeps
-it and drops only the incomparable number. The one route back to a
+catalog example and the build was available at the pin, was declined
+deliberately (D-0063, 2026-08-23). By the spike's own rule such a
+number never shares a table with riscv64 numbers, so it would cost a
+build, a campaign, and an exhibit to produce a figure the reader is
+then told not to compare with anything else in this report. The
+discipline that makes the Linux ratios meaningful (same host, same
+pinned QEMU, the emulation penalty applied to both arms) is what a
+cross-ISA row cannot have. Everything of (2) that survives that
+scrutiny is the source-level analysis above; fallback (3) keeps it
+and drops only the incomparable number. The one route back to a
 three-way that does not cross the no-core-patches line is the
 `fdt_xlat` stub being fixed in the PR branch itself, followed by a
-re-pin to that head; it is noted, not planned (Future work).
-
----
+re-pin to that head; it is noted, not planned (Future work). ---
 
 ## Threats to validity
 

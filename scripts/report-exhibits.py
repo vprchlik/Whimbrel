@@ -1614,12 +1614,11 @@ def write_cross_system(
             "",
             "Ratios below are E0→E4 medians on **RISC-V under QEMU TCG "
             "software emulation**, same host, same QEMU, both arms. "
-            "Published unikernel figures (2–3 ms) and Firecracker's "
-            "~125 ms Linux boot are x86 with KVM hardware "
-            "virtualization, where absolute times run roughly 5–10× "
-            "lower. Those absolute numbers are not comparable to the "
-            "medians in this table; the ratio is, because the "
-            "emulation penalty applies to both arms.",
+            "Published unikernel and microVM boot figures come from "
+            "x86 under KVM hardware virtualization, and the medians in "
+            "this table compare with none of them; the ratio is the "
+            "comparable quantity, because the emulation penalty "
+            "applies to both arms.",
             "",
             f"- `release-fast-boot` / `trimmed` = "
             f"**{fmt_ratio(trim_e4, fast_e4)}**",
