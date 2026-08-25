@@ -1739,6 +1739,18 @@ qualitative Unikraft section, stated in the abstract. If their build
 requires a different QEMU version, a Whimbrel control row runs under that
 QEMU to bound the version effect. Sequenced right after T4.3 so the
 comparison section's shape settles while the draft is young.
+**Concluded T4.9 (no-go at the pin; D-0063).** Pin recorded
+2026-08-22: PR #1698 head `e9b1d549`, kraftkit prerelease
+`v0.12.15-11-g5019204e`, catalog `c-http` `7196610a`. Go criteria
+not met by source analysis at the pin — the riscv64 network path is
+nonfunctional (the PLIC driver registers no `fdt_xlat`; the platform
+bus asserts on it while probing the `virtio,mmio` transports QEMU
+`virt` always presents; crash before `main`) and the fix is new
+driver code, which the no-core-patches line forbids; the abandon
+line held, no patch written. Fallback (3) selected 2026-08-23. The
+Results section "Unikraft: boot-path analysis at the pin" was
+written 2026-08-24 — acceptance met in its qualitative-analysis
+form.
 
 - **Acceptance:** go/no-go recorded with evidence; the corresponding
   report section exists in the draft with numbers or the qualitative

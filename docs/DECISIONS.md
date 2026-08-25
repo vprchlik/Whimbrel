@@ -2644,7 +2644,8 @@ D-0011 onward are working decisions made under those constraints.
 ## D-0063: Unikraft spike — go/no-go and the no-core-patches line
 - Date: 2026-08-16 — Status: accepted (pin recorded 2026-08-22; go
   criteria **not met** at the pin, abandon line held — see Outcome;
-  fallback (3) selected 2026-08-23 — see Fallback choice)
+  fallback (3) selected 2026-08-23 — see Fallback choice; Results
+  section written 2026-08-24, T4.9 acceptance met)
 - **Decision:** pin the unikraft/unikraft PR #1698 branch commit and the
   kraftkit version in this entry when the spike starts. **Go** = the
   HTTP example builds for qemu/riscv64 at the pin, boots on our pinned
@@ -2834,7 +2835,8 @@ D-0011 onward are working decisions made under those constraints.
   qualitative section lives in Results beside the Linux boot
   decomposition, stubbed in the draft now and written at T4.11 from
   this entry's Outcome. T4.9's acceptance (section exists in the
-  draft) stays open until the stub is written.
+  draft) stays open until the stub is written — written 2026-08-24;
+  acceptance met.
 
 ## D-0064: Report structure, claims discipline, convergence, audits
 - Date: 2026-08-16 — Status: accepted
@@ -7261,6 +7263,13 @@ D-0011 onward are working decisions made under those constraints.
   bench host is touched for the one-time image-bytes record (A2 — a
   measurement of files, not a boot) and for the T4.11 acceptance
   regeneration of the exhibits from those pins on a clean machine.
+  PLAN's M4 acceptance sentence — `just bench` runs end-to-end on a
+  clean machine following SETUP.md and regenerates `results/*.csv`
+  and every cited number — predates D-0067 and is amended at T4.12
+  rather than reinterpreted: under D-0067 that run is a
+  harness-liveness check whose CSVs enter nothing, and the criterion
+  gate 1 actually tests is byte-identical reproduction of every
+  exhibit from the pins on a clean checkout.
 - **Alternatives considered:** A1 — landing `virtq_init` (rejected: a
   kernel change plus a campaign to move a comparison ratio by ~1.6%
   of its denominator; the rung stays on record as eligible so a later
@@ -7297,7 +7306,8 @@ D-0011 onward are working decisions made under those constraints.
   gate 2 read as landed-or-declined-with-reason), D-0058 (ladder
   closed), D-0010 (syscall-latency consequence descoped), and D-0080
   (status: stated-open in the report); PLAN T4.10's acceptance
-  amended to image bytes only, and T4.12's catch-up list extended by
+  amended to image bytes only, the M4 acceptance sentence amended per
+  the scope decision above, and T4.12's catch-up list extended by
   these pointers; the ladder generator, the image-bytes record and
   its script, the cross-system column with its fail-closed hash
   check, and the A3 rewording of `write_cross_system`, each with a
