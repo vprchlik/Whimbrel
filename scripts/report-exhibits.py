@@ -15,7 +15,10 @@ pins do not follow it. The T4.8b table comes from its own CSV pin
 table comes from `t48c` (D-0081) with T4.8b frozen as the before.
 The T4.7 firmware exhibit comes from the t47c CSV pin (`c2759e2`).
 The T4.4 exhibit comes from the `t44` tag (D-0065), kept as the
-pre-superpage pin. `cross-system-current.md` is an alias for whichever campaign
+pre-superpage pin. `ladder.md` (D-0083 A8) reads the baseline, `t44`, and after-ladder
+pins, plus the current comparison pin for the `virtq_init` row's
+E0→E4 share; declined rungs are rows carrying their reasons.
+`cross-system-current.md` is an alias for whichever campaign
 CURRENT_COMPARISON names: the report's prose cites it wherever it
 means "the comparison"; per-campaign exhibits stay frozen.
 The working-tree files are not read — a local `just bench` leftover
@@ -51,6 +54,66 @@ AFTER_BATCHES = frozenset({"20260817T061753Z-1", "20260817T061753Z-2"})
 AFTER_SHA_PREFIX = "76830e13"
 # Caption label for the after-ladder CSV pin (not the baseline freeze).
 LADDER_LABEL = "superpages"
+
+# The optimization ladder (D-0058 governance; closed by D-0083 A1,
+# exhibit per D-0083 A8). Numeric cells come from the pins. Each
+# baseline / landed row carries `quoted_ms`, the fast E2→E3g its
+# decision entry states; the writer cross-checks it against the pin at
+# display precision and refuses to generate on a disagreement, so a
+# retargeted pin or a drifted quote cannot print. Disposition and
+# reason text is generator prose, like PHASE_NECESSARY; the writer
+# appends the computed share, bar, and E0→E4 fraction to a declined
+# row that names a phase. A declined row without a reason refuses.
+LADDER_BAR_FRACTION = 0.05
+LADDER_RUNGS = (
+    {
+        "rung": "T4.3 freeze (no rung)",
+        "decision": "D-0055",
+        "kind": "baseline",
+        "pin": "baseline",
+        "quoted_ms": 21.42,
+        "disposition": "the origin every Δ below is against; tag "
+        "`baseline-t4.3`",
+    },
+    {
+        "rung": "bump / lazy free-list",
+        "decision": "D-0065",
+        "kind": "landed",
+        "pin": "t44",
+        "quoted_ms": 9.17,
+        "disposition": "landed T4.4; pin `t44` "
+        "([t44-bump.md](t44-bump.md)); subsumes D-0060",
+    },
+    {
+        "rung": "D-0060 allocated counter",
+        "decision": "D-0060",
+        "kind": "declined",
+        "phase": None,
+        "reason": "declined-by-subsumption (D-0058): the bump "
+        "representation is the accounting, and a counter on the old "
+        "list would have left `frame_init` at its freeze cost",
+    },
+    {
+        "rung": "2 MiB superpages",
+        "decision": "D-0059",
+        "kind": "landed",
+        "pin": "after",
+        "quoted_ms": 6.43,
+        "disposition": "landed T4.6; pin `c40945c` (the after-ladder "
+        "columns of [phase-decomposition.md](phase-decomposition.md))",
+    },
+    {
+        "rung": "`virtq_init` skip (discarded first program+verify pass)",
+        "decision": "D-0083",
+        "kind": "declined",
+        "phase": "virtq_init",
+        "reason": "declined as a stopping decision (D-0083 A1), still "
+        "eligible under D-0058: the gain is a ceiling "
+        "(`fill_descriptors` stays) and does not move the comparison "
+        "claim; a reader who takes the rung measures against the "
+        "current comparison pin and adds a row",
+    },
+)
 
 # T4.4 bump-allocator CSV commit (D-0065), annotated tag `t44` so a
 # reader can `git show t44:…`, same form as t48b / t48c. Measured
@@ -1529,6 +1592,149 @@ def write_t44_bump(
             "before. It sits beside a baseline column from a "
             "different campaign pin; the two values are two pins, "
             "not a disagreement.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def write_ladder(
+    base_rec: list[dict],
+    base_phases: list[dict],
+    t44_rec: list[dict],
+    t44_phases: list[dict],
+    after_rec: list[dict],
+    after_phases: list[dict],
+    *,
+    cur_rec: list[dict],
+    cur_entry: tuple,
+    rungs: tuple = LADDER_RUNGS,
+) -> str:
+    """The optimization ladder (D-0058; closed by D-0083). Rung × fast
+    E2→E3g after × cumulative Δ vs baseline × disposition, with the
+    declined rungs as rows carrying their reasons.
+
+    Fails closed when a baseline / landed row's pin median disagrees
+    with the value its decision entry quotes (display precision),
+    when a declined row has no reason, or when a named phase has no
+    recorded rows on the after-ladder pin.
+    """
+    pins = {
+        "baseline": (base_rec, base_phases),
+        "t44": (t44_rec, t44_phases),
+        "after": (after_rec, after_phases),
+    }
+    base_e2 = e2e3g_median(base_rec, base_phases, FAST)
+    after_e2 = e2e3g_median(after_rec, after_phases, FAST)
+    bar = LADDER_BAR_FRACTION * after_e2
+    after_fast = phase_deltas(after_rec, after_phases, FAST)
+    cur_label, cur_rev = cur_entry[0], cur_entry[1]
+    cur_e4 = cfg_median(cur_rec, FAST, "e0_to_e4_ns")
+
+    rows: list[tuple[str, str, str, str, str]] = []
+    for rung in rungs:
+        name = rung["rung"]
+        kind = rung["kind"]
+        if kind in ("baseline", "landed"):
+            rec, ph = pins[rung["pin"]]
+            med = e2e3g_median(rec, ph, FAST)
+            quoted = float(rung["quoted_ms"])
+            if abs(med / 1e6 - quoted) > 0.005:
+                raise ExhibitFail(
+                    f"TEST FAIL: ladder row {name!r} disagrees with its "
+                    f"pin: pin median {fmt_ns(med)}, {rung['decision']} "
+                    f"quotes {quoted:.2f} ms"
+                )
+            if kind == "baseline":
+                delta_cell = "0"
+            else:
+                delta = med - base_e2
+                delta_cell = (
+                    f"{fmt_delta(delta)} "
+                    f"({delta / base_e2 * 100:+.0f}%)".replace("-", "−")
+                )
+            rows.append(
+                (name, rung["decision"], fmt_ns(med), delta_cell,
+                 rung["disposition"])
+            )
+            continue
+        if kind != "declined":
+            raise ExhibitFail(
+                f"TEST FAIL: ladder row {name!r} has unknown kind {kind!r}"
+            )
+        reason = (rung.get("reason") or "").strip()
+        phase = rung.get("phase")
+        if phase is None:
+            if not reason:
+                raise ExhibitFail(
+                    f"TEST FAIL: ladder row {name!r} is declined without "
+                    "a reason"
+                )
+            rows.append((name, rung["decision"], "–", "–", reason))
+            continue
+        vals = after_fast.get(phase, [])
+        if not vals:
+            raise ExhibitFail(
+                f"TEST FAIL: ladder has no recorded {phase} rows on the "
+                "after-ladder pin"
+            )
+        v_med = statistics.median(vals)
+        above = v_med >= bar
+        side = "above" if above else "below"
+        if not reason:
+            raise ExhibitFail(
+                f"TEST FAIL: ladder row {name!r} is declined {side} the "
+                "5% bar without a reason"
+            )
+        share = v_med / after_e2 * 100
+        pct_e4 = v_med / cur_e4 * 100
+        detail = (
+            f"{fmt_ns(v_med)} = {share:.0f}% of the after-ladder E2→E3g "
+            f"({fmt_ns(after_e2)}), {side} the 5% bar ({fmt_ns(bar)}); "
+            f"{pct_e4:.1f}% of the {cur_label} `{FAST}` E0→E4 "
+            f"({fmt_ns(cur_e4)})"
+        )
+        rows.append((name, rung["decision"], "–", "–", f"{reason}. {detail}"))
+
+    b0, b1 = sorted(BASELINE_BATCHES)
+    t0, t1 = sorted(T44_BATCHES)
+    a0, a1 = sorted(AFTER_BATCHES)
+    lines = [
+        "<!-- generated by scripts/report-exhibits.py — do not edit -->",
+        "",
+        "The optimization ladder (D-0058 governance; closed by D-0083). "
+        f"Fast-boot (`{FAST}`) E2→E3g per rung, from the pins: tag "
+        f"`{BASELINE_TAG}` (batches `{b0}` / `{b1}`, measured kernel "
+        f"`{BASELINE_SHA_PREFIX}`), tag `{T44_REV}` (batches `{t0}` / "
+        f"`{t1}`, measured kernel `{T44_SHA_PREFIX}`), and "
+        f"`{AFTER_REV}` (batches `{a0}` / `{a1}`, measured kernel "
+        f"`{AFTER_SHA_PREFIX}`), n=60 recorded per config, warmup "
+        "excluded. Declined rungs are rows carrying their reasons. The "
+        f"5% bar is {LADDER_BAR_FRACTION:.0%} of the after-ladder E2→E3g "
+        "median (D-0058). The E0→E4 fraction on a declined row reads "
+        f"the {cur_label} comparison pin (`{cur_rev}`), the comparison "
+        "the decision cites. Each baseline and landed row's after "
+        "value is cross-checked against the value its decision entry "
+        "quotes; a disagreement refuses to generate. Working-tree CSVs "
+        "are not read. Regeneration: `just report-exhibits`.",
+        "",
+        "| rung | decision | fast E2→E3g after | cumulative Δ vs "
+        f"`{BASELINE_TAG}` | disposition |",
+        "|---|---|---:|---:|---|",
+    ]
+    for name, decision, after_cell, delta_cell, disp in rows:
+        lines.append(
+            f"| {md_cell(name)} | {decision} | {after_cell} | "
+            f"{delta_cell} | {md_cell(disp)} |"
+        )
+    lines.extend(
+        [
+            "",
+            "Every rung is landed-with-row or declined-with-reason "
+            "(D-0064 gate 2). Closing the ladder does not declare the "
+            "floor: the floor language stays the minimum structurally "
+            "necessary under these conditions, bounded below by the "
+            "rows argued necessary (D-0064, D-0083).",
             "",
         ]
     )
@@ -4131,6 +4337,126 @@ def cmd_selftest() -> int:
         "t44 missing E3g",
     )
 
+    # --- ladder exhibit (write_ladder; D-0083 A8) ---
+    def lad_run(cfg: str, batch: str) -> dict:
+        return {
+            "batch_id": batch,
+            "trial": "1",
+            "warmup": "0",
+            "config": cfg,
+            "e0_to_e4_ns": "2000",
+        }
+
+    def lad_phase(
+        cfg: str, batch: str, phase: str, since_ns: int, delta_ns: int
+    ) -> dict:
+        return {
+            "batch_id": batch,
+            "trial": "1",
+            "warmup": "0",
+            "config": cfg,
+            "phase": phase,
+            "delta_ns": str(delta_ns),
+            "ns_since_e2": str(since_ns),
+        }
+
+    def lad_pin(e3g_since_ns: int, virtq_delta_ns: int):
+        rec = [lad_run(cfg, b) for cfg in (FAST, SAFE) for b in ("l-1", "l-2")]
+        ph = [
+            lad_phase(cfg, b, "E3g", e3g_since_ns, 100)
+            for cfg in (FAST, SAFE)
+            for b in ("l-1", "l-2")
+        ] + [
+            lad_phase(cfg, b, "virtq_init", 500, virtq_delta_ns)
+            for cfg in (FAST, SAFE)
+            for b in ("l-1", "l-2")
+        ]
+        return rec, ph
+
+    # Fixture pins reproduce the quoted values in LADDER_RUNGS exactly.
+    lad_base = lad_pin(21_420_000, 850_500)
+    lad_t44 = lad_pin(9_170_000, 845_400)
+    lad_after = lad_pin(6_430_000, 842_000)
+    lad_cur = [
+        {
+            "batch_id": b,
+            "warmup": "0",
+            "system": "whimbrel",
+            "config": FAST,
+            "e0_to_e4_ns": "51950000",
+        }
+        for b in ("l-1", "l-2")
+    ]
+    lad_entry = (
+        "T4.Xl", "fixture-rev", frozenset({"l-1", "l-2"}), "cafe", 2, "x.md",
+    )
+
+    def lad_write(
+        base=lad_base, t44=lad_t44, after=lad_after, rungs=LADDER_RUNGS
+    ) -> str:
+        return write_ladder(
+            *base, *t44, *after, cur_rec=lad_cur, cur_entry=lad_entry,
+            rungs=rungs,
+        )
+
+    lad_text = lad_write()
+    if "above the 5% bar" not in lad_text:
+        raise ExhibitFail(
+            "TEST FAIL: ladder fixture did not report virtq_init above the bar"
+        )
+    fired.append("write_ladder accepts a clean fixture")
+    lad_drift = tuple(
+        dict(r, quoted_ms=9.18) if r.get("pin") == "t44" else r
+        for r in LADDER_RUNGS
+    )
+    expect_fail(
+        lambda: lad_write(rungs=lad_drift),
+        "disagrees with its pin",
+        "ladder planted cell disagreeing with its pin",
+    )
+    lad_moved = lad_pin(9_230_000, 845_400)
+    expect_fail(
+        lambda: lad_write(t44=lad_moved),
+        "disagrees with its pin",
+        "ladder planted pin disagreeing with the quoted cell",
+    )
+    lad_noreason = tuple(
+        dict(r, reason="") if r.get("phase") == "virtq_init" else r
+        for r in LADDER_RUNGS
+    )
+    expect_fail(
+        lambda: lad_write(rungs=lad_noreason),
+        "above the 5% bar without a reason",
+        "ladder planted declined-above-bar row without a reason",
+    )
+    lad_nosub = tuple(
+        dict(r, reason="") if r["rung"].startswith("D-0060") else r
+        for r in LADDER_RUNGS
+    )
+    expect_fail(
+        lambda: lad_write(rungs=lad_nosub),
+        "declined without a reason",
+        "ladder planted declined row without a reason",
+    )
+    lad_after_novirtq = (
+        lad_after[0],
+        [p for p in lad_after[1] if p["phase"] != "virtq_init"],
+    )
+    expect_fail(
+        lambda: lad_write(after=lad_after_novirtq),
+        "no recorded virtq_init rows",
+        "ladder missing phase rows",
+    )
+    lad_badkind = tuple(
+        dict(r, kind="parked") if r.get("pin") == "t44" else r
+        for r in LADDER_RUNGS
+    )
+    expect_fail(
+        lambda: lad_write(rungs=lad_badkind),
+        "unknown kind",
+        "ladder unknown row kind",
+    )
+
     # --- current-comparison alias (cross-system-current.md) ---
     cur_entry = current_comparison_entry()
     if cur_entry[0] != CURRENT_COMPARISON:
@@ -4395,6 +4721,20 @@ def main() -> int:
             encoding="utf-8",
             newline="\n",
         )
+        (OUT_DIR / "ladder.md").write_text(
+            write_ladder(
+                base_rec,
+                base_phases,
+                t44_rec,
+                t44_phases,
+                after_rec,
+                after_phases,
+                cur_rec=recorded(cur_runs),
+                cur_entry=cur_entry,
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
         linux_serial = git_show(SERIAL_REV, LINUX_SERIAL_PATH)
         whim_serial = git_show(SERIAL_REV, WHIMBREL_SERIAL_PATH)
         labels_text = git_show(LABEL_REV, LABEL_PATH)
@@ -4433,6 +4773,7 @@ def main() -> int:
         print((OUT_DIR / "cross-system-current.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "linux-decomposition.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "t47-firmware.md").read_text(encoding="utf-8"))
+        print((OUT_DIR / "ladder.md").read_text(encoding="utf-8"))
         return 0
     except ExhibitFail as e:
         print(e, file=sys.stderr)

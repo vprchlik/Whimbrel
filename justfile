@@ -845,7 +845,8 @@ report-exhibits:
     python3 scripts/report-exhibits.py
 
 # Failing-input selftest for validate / validate_t48 / validate_t48c /
-# validate_t47, the current-comparison alias, and the T4.4 exhibit.
+# validate_t47, the current-comparison alias, the T4.4 exhibit, and
+# the ladder exhibit (D-0083 A8).
 # Does not write exhibits.
 report-exhibits-selftest:
     python3 scripts/report-exhibits.py selftest

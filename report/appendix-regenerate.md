@@ -38,6 +38,7 @@ the generator reads `git show <pin>:results/{runs,phases}.csv`.
 | T4.8b ([cross-system-t48b.md](exhibits/cross-system-t48b.md)) | tag `t48b` | `20260819T142033Z-1` / `-2` | `06687e2` |
 | T4.8c ([cross-system-t48c.md](exhibits/cross-system-t48c.md)); [cross-system-current.md](exhibits/cross-system-current.md) is the generated alias (`CURRENT_COMPARISON`) | tag `t48c` | `20260821T233038Z-1` / `-2` | `1c8816e` |
 | Linux boot decomposition ([linux-decomposition.md](exhibits/linux-decomposition.md)) | serial `d705ecb8c67350519f9ce4653a4685a89e20e1d4` (`results/serial/`, T4.8 batch 1, trial 4) plus the D-0072 label pin `93ab617676672f6db7a1d076389f9a049678192a` (one `ignore_loglevel` diagnostic boot of the same `Image-trimmed`) | `20260818T073023Z-1` trial 4; diagnostic boot `20260818T084831Z` | `1005399` (Whimbrel arm of the same batch) |
+| ladder ([ladder.md](exhibits/ladder.md)) | `baseline-t4.3`, `t44`, and `c40945c…` above, plus the current comparison pin (`t48c`) for the `virtq_init` row's E0→E4 fraction | | |
 | regime witness ([regime-witness.md](exhibits/regime-witness.md)) | every campaign's pinned CSVs above, read by `scripts/regime-witness.py` | | |
 | D-0070 pcap pass ([d0070-pcap.md](exhibits/d0070-pcap.md)) | the T4.6 and D-0068 pins above plus their per-trial pcaps, which are gitignored; generated on the bench host and committed from there | | |
 

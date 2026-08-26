@@ -783,13 +783,12 @@ reported as `D_fin`.
 
 ### Ladder
 
-| rung | hypothesis | E2→E3g after | Δ vs `baseline-t4.3` | disposition |
-|---|---|---|---|---|
-| bump / lazy free-list | stop linking ~31k virgin frames; `free_count()` is bump arithmetic | 9.17 ms | −12.25 ms (−57%) | landed T4.4 (D-0065); pin `t44`, batches `20260817T052349Z-1`/`-2`
-([exhibits/t44-bump.md](exhibits/t44-bump.md)); subsumes D-0060. Secondary: later phases faster (warm data cache; matched pair) |
-| D-0060 allocated counter | `free_count = TOTAL − allocated` on the current list | — | — | declined-by-subsumption |
-| 2 MiB superpages (D-0059) | mixed-granularity identity map; level-aware verifier; grain-aware `assert_range` | 6.43 ms | −15.00 ms (−70% vs freeze); −2.74 ms (−30% vs T4.4) | **landed T4.6**; batches `20260817T061753Z-1`/`-2`; `tables_used`=5; paging 3.84 → 1.12 ms. Phase ranges over (D-0069); E2→E3g in range. Secondary: `freeze` slower (cold I-translation; matched pair) |
-| `virtq_init` skip discarded program+verify | first pass wiped by `net::init` reset; `fill_descriptors` stays | — | 842 µs = 13% of 6.43 ms; 5% bar is 322 µs | **eligible, not next.** Ceiling on the gain. Linux takes the honest number |
+The ladder is [exhibits/ladder.md](exhibits/ladder.md): rung × fast
+E2→E3g after × cumulative Δ vs `baseline-t4.3` × disposition,
+generated from the `baseline-t4.3`, `t44`, and `c40945c` pins, with
+the declined rungs (D-0060 by subsumption; `virtq_init` as a
+stopping decision) as rows carrying their reasons, and the
+`virtq_init` row showing its share against the 5% bar.
 
 ### Superpage outcome (D-0059; T4.6)
 
@@ -819,18 +818,19 @@ rungs:
 | `page_build` 6% | leftover after mixed granularity |
 | `serving_ready` 6% | ARP wait; not kernel compute |
 
-By D-0058's letter the ladder is not closed: `virtq_init` still
-clears 5% of E2→E3g. D-0068 was the next *action* and has been
-measured: it did not move E0→E4. The Linux campaigns have since
-run (T4.8 → T4.8b → T4.8c), and T4.7 measured the firmware
-window — not a rung: it changes the boot contract (see "Firmware
-removal" below). Fast E0→E4 is
-51.66 ms on the T4.6 after-ladder pin; skipping the discarded
-virtqueue pass is ~0.8 ms of that (1.6%). virtq_init stays
-recorded-eligible. The floor is not declared. The former ~31 ms
-"E3w→E4" of that 52 ms is resolved: QEMU startup + guest boot
-wait + sub-ms delivery (D-0070/D-0071), each counted once in
-E0→E4 — there is no separate host term to take.
+By D-0058's letter `virtq_init` still clears 5% of E2→E3g; the
+ladder closed with it declined as a stopping decision (D-0083;
+[exhibits/ladder.md](exhibits/ladder.md)). D-0068 was the next
+*action* and has been measured: it did not move E0→E4. The Linux
+campaigns have since run (T4.8 → T4.8b → T4.8c), and T4.7 measured
+the firmware window — not a rung: it changes the boot contract (see
+"Firmware removal" below). Fast E0→E4 is 51.66 ms on the T4.6
+after-ladder pin; skipping the discarded virtqueue pass is ~0.8 ms
+of that (1.6%). `virtq_init` stays eligible on the ladder's record
+(Future work). The floor is not declared. The former ~31 ms "E3w→E4"
+of that 52 ms is resolved: QEMU startup + guest boot wait + sub-ms
+delivery (D-0070/D-0071), each counted once in E0→E4 — there is no
+separate host term to take.
 
 Leaf-count derivation — arithmetic from the T4.4 exhaust line,
 not a measurement: `total=31823` → `__heap_end` ≈ `0x803B1000`;
@@ -1521,6 +1521,7 @@ bracket for the image-size component of S.
 - [Numbers that must be regenerated, and Pins](appendix-regenerate.md)
   (audit findings 16–23; the pin behind every exhibit column).
 - [Phase decomposition exhibit](exhibits/phase-decomposition.md)
+- [Ladder exhibit](exhibits/ladder.md)
 - [Edges exhibit](exhibits/edges.md)
 - [T4.4 bump exhibit](exhibits/t44-bump.md)
 - [Dump placement exhibit](exhibits/dump-placement.md)
