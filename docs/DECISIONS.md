@@ -2644,7 +2644,8 @@ D-0011 onward are working decisions made under those constraints.
 ## D-0063: Unikraft spike — go/no-go and the no-core-patches line
 - Date: 2026-08-16 — Status: accepted (pin recorded 2026-08-22; go
   criteria **not met** at the pin, abandon line held — see Outcome;
-  fallback (3) selected 2026-08-23 — see Fallback choice)
+  fallback (3) selected 2026-08-23 — see Fallback choice; Results
+  section written 2026-08-24, T4.9 acceptance met)
 - **Decision:** pin the unikraft/unikraft PR #1698 branch commit and the
   kraftkit version in this entry when the spike starts. **Go** = the
   HTTP example builds for qemu/riscv64 at the pin, boots on our pinned
@@ -2834,7 +2835,8 @@ D-0011 onward are working decisions made under those constraints.
   qualitative section lives in Results beside the Linux boot
   decomposition, stubbed in the draft now and written at T4.11 from
   this entry's Outcome. T4.9's acceptance (section exists in the
-  draft) stays open until the stub is written.
+  draft) stays open until the stub is written — written 2026-08-24;
+  acceptance met.
 
 ## D-0064: Report structure, claims discipline, convergence, audits
 - Date: 2026-08-16 — Status: accepted
@@ -6010,10 +6012,10 @@ D-0011 onward are working decisions made under those constraints.
 
     | arm | b1 E0→E4 | b2 E0→E4 | b1 E2→E3g | b2 E2→E3g |
     |---|---:|---:|---:|---:|
-    | release-fast-boot | 52.20 (0.72) | 52.13 (0.34) | 6.406 (0.056) | 6.393 (0.057) |
-    | release-default | 139.67 (1.17) | 139.41 (0.95) | 90.816 (0.581) | 90.799 (0.855) |
-    | m-release-fast-boot | 28.56 (0.60) | 28.39 (0.25) | 5.738 (0.155) | 5.656 (0.082) |
-    | m-release-default | 96.70 (0.82) | 96.42 (0.45) | 73.597 (0.330) | 73.525 (0.291) |
+    | release-fast-boot | 52.20 (0.64) | 52.13 (0.32) | 6.406 (0.051) | 6.393 (0.052) |
+    | release-default | 139.67 (1.10) | 139.41 (0.87) | 90.816 (0.506) | 90.799 (0.829) |
+    | m-release-fast-boot | 28.56 (0.54) | 28.39 (0.23) | 5.738 (0.152) | 5.656 (0.076) |
+    | m-release-default | 96.70 (0.76) | 96.42 (0.40) | 73.597 (0.306) | 73.525 (0.265) |
 
   - Per-batch fast-pair ΔE0→E4 (shim − OpenSBI): **−23.65 ms**
     (b1) and **−23.74 ms** (b2) — batch-consistent to 90 µs.
@@ -6193,7 +6195,7 @@ D-0011 onward are working decisions made under those constraints.
     recorded trials; counts gated; `falsifier3_mtrap: 0 hits in 264
     trial serials + canary` (computed, fail-closed). **Regime:
     inflated, established by the witness** — all 60 recorded
-    safe-arm trials in 15.613–16.535 ms (median 16.180, IQR 0.142),
+    safe-arm trials in 15.613–16.535 ms (median 16.180, IQR 0.141),
     uniform across batches (16.249/16.131); the canary read 12.007
     and **disagrees**, the second of two comparable cases — see the
     D-0078 amendment refutation block for what the canary actually
@@ -6221,8 +6223,8 @@ D-0011 onward are working decisions made under those constraints.
     - Falsifier 5 PASS by construction: the t48b exhibit pins are
       immutable git objects; nothing republished.
   - **Claims (design (d)). Claim A**, pooled ΔE2→E3g, stability-
-    gated: **−0.714 ms** (fast 6.402, IQR 0.060; m-fast 5.688, IQR
-    0.102; per batch −0.718/−0.703; inside the registered
+    gated: **−0.714 ms** (fast 6.402, IQR 0.057; m-fast 5.688, IQR
+    0.098; per batch −0.718/−0.703; inside the registered
     [−1.1, −0.4]; t47 read −0.717 — reproduction to 3 µs across a
     day). **Claim B**, ΔE0→E4 per batch: **−23.691 (batch 1),
     −23.689 (batch 2) ms** — the two batches agree to 2 µs.
@@ -6269,6 +6271,51 @@ D-0011 onward are working decisions made under those constraints.
     drift probe; the `gate-failures.csv` rotation fix; computing
     falsifiers 1, 2, ΔS and 6; the audit's other prose-only
     registrations.
+- **Correction to the t47b and t47c IQR cells (2026-08-24).** The
+  per-arm table under the aborted confirmation, and the t47c
+  witness and Claim A IQRs, were replaced in place with harness
+  `iqr()` (inclusive / type 7). The published copies did not come
+  from `scripts/bench.py`. t47b's came from `statistics.quantiles()`
+  at its default, which is exclusive / type 6 while the harness is
+  inclusive / type 7 — all sixteen cells matched exclusive after
+  the table's own rounding, and zero matched the harness. t47c's
+  came from a different hand-typed quartile, integer-index
+  `s[3n//4] - s[n//4]` (n=60: `s[45] - s[15]`), identified by the
+  banker's-rounding fingerprint on 0.1425 → 0.142; exclusive
+  formats as 0.103 / 0.155 and inclusive as 0.098 / 0.141, so t47c
+  was neither. Replaced: t47b IQR column 0.72/0.34/0.056/0.057,
+  1.17/0.95/0.581/0.855, 0.60/0.25/0.155/0.082, 0.82/0.45/0.330/
+  0.291 → 0.64/0.32/0.051/0.052, 1.10/0.87/0.506/0.829, 0.54/0.23/
+  0.152/0.076, 0.76/0.40/0.306/0.265; t47c witness 0.142 → 0.141,
+  Claim A 0.060 / 0.102 → 0.057 / 0.098. Every median in those
+  tables was exact to the nanosecond; only dispersion was
+  affected. No gate or falsifier uses IQR, so no verdict changed
+  and no campaign needed re-running. The live T4.7 exhibit already
+  printed harness inclusive from the same pin (`c2759e2`), so only
+  the typed copy in this entry was wrong. Nothing structural stops
+  this recurring: the generators are gated; a hand-typed number in
+  an entry is not. That is why entries quote exhibits.
+- **F8 — falsifier 3 on the shim gate path (2026-08-24).** The
+  registered wording was "any serial of any trial or gate." The
+  computed scan added before t47c covered campaign trial serials
+  and the canary only. The only gate that boots the shim is
+  `just test-m`, via two `boot-test.sh` invocations with
+  `QEMU_BIOS` set to the blob. `boot-test.sh` now calls
+  `python3 scripts/bench.py scan-mtrap` after QEMU, only when
+  `QEMU_BIOS` is set and not `default`, on every exit path that
+  has a log **including 124**. A hit is `TEST FAIL` (falsifier 3),
+  not `TEST HANG`. That ordering is the actual catch: `_mshim_mtrap`
+  parks in `wfi`, so QEMU never stores to sifive_test and the
+  timeout returns 124; a scan that ran only on PASS (including
+  `check-serial`) could never see the diagnostic. OpenSBI gates
+  are not scanned — they cannot print `M!`. The scanner CLI is
+  planted in `bench-selftest` and `just test-mtrap-planted` (file
+  fixture, no QEMU). **The gate integration is desk-checked only
+  until a trapping shim boot is run on the bench host;** this
+  machine has no QEMU. Campaign `run_trial` still reads serial
+  after the HTTP client checks, and a parked shim hits the QEMU
+  timeout raise before either — not a one-line reorder, not
+  changed here.
 - Revisit trigger: any falsifier; QEMU moving the `virt` FDT or
   reset address (checkpoint 0 and the `check_dtb` assert both catch
   it loudly); or the seams demanding a change outside D-0061's
@@ -7080,3 +7127,192 @@ D-0011 onward are working decisions made under those constraints.
   is a candidate instrument registration, nothing more. Revisit
   item 2 if any campaign's announce bracket moves regime or if a
   boundary instrument is registered.
+
+## D-0083: Close the report's open decisions; no further campaigns before sign-off
+- Date: 2026-08-24 — Status: accepted
+- **Context:** the T4.11 scoping pass (2026-08-24) found the draft
+  number-correct after the enforcement and currency audits but short
+  of D-0064's structure in four sections and one restructure, and
+  found eight decisions that writing could not proceed past — two of
+  which (A1, A2) could have required a bench-host campaign. All eight
+  are settled here in one entry so the log carries one record of the
+  batch. Numbers below are quoted from the exhibits named, never
+  typed from memory.
+- **Decision — A1, the ladder closes with `virtq_init` declined.**
+  `virtq_init` (the first virtqueue program+verify pass, wiped by
+  `net::init`'s reset; audit finding 4) is declined as a rung on
+  D-0058's decline-with-reason path. Reason: its ceiling gain of
+  0.84 ms of guest work (D-0058: `fill_descriptors` stays) is 1.6% of
+  the 51.95 ms `release-fast-boot` E0→E4 the T4.8c comparison rests on
+  (`report/exhibits/cross-system-current.md`); the comparison claim
+  does not move, and the ladder's purpose was finding the floor's
+  shape, not reaching it. **This is a stopping decision, not a
+  discovery that the rung is ineligible:** at 842 µs = 13% of 6.43 ms
+  (`report/exhibits/phase-decomposition.md`) it remains above
+  D-0058's 5% bar (322 µs), and the ladder exhibit says so in the
+  row. The ladder therefore closes as: bump / lazy free-list (landed
+  T4.4, D-0065); D-0060 (declined-by-subsumption); superpages (landed
+  T4.6, D-0059); `virtq_init` (declined, this entry) — every rung
+  landed-with-row or declined-with-reason, which is what D-0064's
+  gate 2 asks for. Closing the ladder does not declare the floor; the
+  report's floor language stays D-0064's ("minimum structurally
+  necessary under these conditions, bounded below by the rows argued
+  necessary").
+- **Decision — A2, T4.10 is scoped to image bytes; RAM and syscall
+  latency are descoped.** The cross-system table gains one column,
+  **image bytes**: the bytes QEMU loads into guest memory from the
+  file passed to `-kernel` — the sum of `PT_LOAD` file sizes for
+  Whimbrel's ELF, the file length for a flat Linux `Image` — the
+  quantity D-0082 showed the pre-guest slice S scales with; the file
+  length is recorded beside it and quoted in the caption. Source,
+  without a campaign: a committed record produced by a script that
+  measures each pinned artifact and verifies its sha256 — the Linux
+  Images against `bench/linux/MANIFEST` at the pin, Whimbrel against
+  the pin's `kernel_sha256` from a build at that pin's `git_sha` —
+  and the exhibit generator reads that record, re-checks each hash
+  against the pin's CSV, and fails closed if a size is absent or a
+  hash disagrees. No cell is typed. D-0064's fixed cross-system
+  columns are amended to: system × E0→first-connect, E0→E4, image
+  bytes; median/IQR/min; N stated — **RAM dropped.** T4.10's
+  remaining work — guest-reported free memory, QEMU max RSS, and the
+  syscall-latency exhibit D-0010's consequences promised (trap path
+  vs vDSO) — is descoped with reason: no published claim depends on
+  them, and RSS under TCG (translation caches and slirp state inside
+  the same host process) is a measurement project of its own.
+  D-0010's "M4 must report syscall latency as trap-based" is
+  therefore not met; the report's future work carries the forgone
+  measurement and says so. Threats item 13 (reservation vs working
+  set, D-0030) becomes a stated-open item carrying the structural
+  numbers from audit finding 23 (88 KiB/slot ≈ 352 KiB reservation;
+  the idle 1 MiB heap of finding 11) and no measured working set.
+- **Decision — A3, no related-work survey and no reference list.**
+  The two uncited external figures — "published unikernel figures
+  (2–3 ms)" and "Firecracker's ~125 ms", with their "roughly 5–10×
+  lower" gloss — come out of the draft's Cross-system section, out
+  of the generator's prose for `cross-system.md`
+  (`write_cross_system`), and out of anywhere else they appear. They
+  are replaced by the claim that needs no number: published unikernel
+  and microVM boot figures come from x86 with KVM hardware
+  virtualization and are not comparable to TCG absolutes; the ratio
+  is the comparable quantity because the emulation penalty applies to
+  both arms. Background becomes a short framing section stating the
+  question the report answers. Reason: uncited numbers are worse than
+  no numbers, and no claim in this report rests on them.
+- **Decision — A4, the abstract.** T4.7 goes in, after the
+  comparison, in one sentence that carries its own conditions (the
+  D-0079 shim in the `-bios` slot; per-batch ΔE0→E4, never pooled)
+  and states that the shim lane is reported separately because Linux
+  structurally cannot take that rung. The abstract's E2→E3g is
+  **6.38 ms** — the T4.8c comparison campaign's
+  (`report/exhibits/cross-system-t48c.md`) — with the campaign named;
+  6.43 ms stays the phase table's denominator where it is the
+  denominator (the T4.6 after-ladder pin). The two-pin distinction is
+  flagged once, at the phase-decomposition exhibit's first citation
+  in Results — not in the abstract, and not in both places.
+- **Decision — A5, D-0080 and the t47b abort are stated-open threats
+  items.** D-0080's status is recorded as: instrument defect found on
+  first execution (an unpaced runner sampling ~1000× off its
+  registered cadence), redesign drafted and not implemented, not
+  re-run, and the question it was registered to answer — what
+  D-0055's stability criterion does about E0-side drift —
+  unanswered. The t47b abort gets a threats item of its own: a
+  campaign that aborted on its own pre-registered gate (the D-0055
+  stability gate), published nothing, and is retained as evidence
+  (its rows are in `report/exhibits/regime-witness.md`). The README
+  already claims an aborted campaign; the report carries it.
+- **Decision — A6, `report/threats-to-validity.md` is retired.**
+  Every seed item is checked against the draft's Threats section and
+  anything the draft lacks is folded in first — on the 2026-08-24
+  read that is item 22, D-0082's 12–15 ms announce-`sendto` interior
+  — and the file is then deleted; the draft's "Seed:" pointer goes
+  with it. Reason: two files carrying the same list with one
+  authoritative is a drift generator; item 21 already had to be
+  corrected in both, and the seed still quotes T4.8's 188.32 ms trim
+  delta three times against the draft's 659.96 ms.
+- **Decision — A7, the preamble is split.** The pin map (which git
+  object each exhibit column reads, and the rule that `HEAD` is never
+  a pin) moves into `report/appendix-regenerate.md` as a "Pins"
+  section beside the kill-list: that appendix is already the
+  regeneration record, and the git objects are what the regeneration
+  acceptance test consumes, not what a reader of Results needs. The
+  "Conditions, stated once" block moves to the opening of
+  Methodology. The writer-facing sentences ("Draft-early skeleton…",
+  "Do not type table cells", the section-fill history) come out
+  entirely.
+- **Decision — A8, the ladder table is a generated companion
+  exhibit.** `scripts/report-exhibits.py` writes
+  `report/exhibits/ladder.md` from the `baseline-t4.3`, `t44`, and
+  after-ladder (`c40945c`) pins: rung × E2→E3g after × cumulative Δ
+  vs baseline × disposition, with declined rungs as rows carrying
+  their reasons (D-0060 by subsumption; `virtq_init` per A1, showing
+  its share and the 5% bar it still clears). Numeric cells come from
+  the pins; disposition text is generator prose, like
+  `PHASE_NECESSARY`. It gets a failing-input selftest under
+  `just report-exhibits-selftest` like the others: a planted row
+  whose cell disagrees with its pin, and a planted declined-above-bar
+  row without a reason, must refuse to generate; a clean fixture must
+  pass. The draft's hand-typed ladder table is replaced by a
+  citation.
+- **Decision — scope: no further campaigns before sign-off.** A1 and
+  A2 were the only remaining items that could have required a
+  bench-host campaign, and both are settled without one. From this
+  entry on, no batch run produces a number that enters the report;
+  every report number comes from pins that exist today
+  (`baseline-t4.3`, `t44`, `c40945c`, the two D-0068 CSV commits,
+  `ffb7ac7` / `d705ecb` / `93ab617`, `t48b`, `t48c`, `c2759e2`). The
+  bench host is touched for the one-time image-bytes record (A2 — a
+  measurement of files, not a boot) and for the T4.11 acceptance
+  regeneration of the exhibits from those pins on a clean machine.
+  PLAN's M4 acceptance sentence — `just bench` runs end-to-end on a
+  clean machine following SETUP.md and regenerates `results/*.csv`
+  and every cited number — predates D-0067 and is amended at T4.12
+  rather than reinterpreted: under D-0067 that run is a
+  harness-liveness check whose CSVs enter nothing, and the criterion
+  gate 1 actually tests is byte-identical reproduction of every
+  exhibit from the pins on a clean checkout.
+- **Alternatives considered:** A1 — landing `virtq_init` (rejected: a
+  kernel change plus a campaign to move a comparison ratio by ~1.6%
+  of its denominator; the rung stays on record as eligible so a later
+  reader can take it against the T4.8c pin); leaving the ladder open
+  (rejected: gate 2 cannot be walked). A2 — running T4.10 in full
+  (rejected: RSS and syscall latency are campaigns whose numbers no
+  claim consumes); dropping image bytes too (rejected: D-0082 made
+  image size a disclosed Linux-side component, so the column is
+  load-bearing for the S disclosure). A3 — citing the two figures
+  (rejected: their sources were never recorded and the report has no
+  reference apparatus to carry them); a related-work survey
+  (rejected: the draft already refused "a literature dump that
+  outruns the apparatus"). A4 — an abstract without T4.7 (rejected:
+  the largest single E0→E4 change in the project, and the lane
+  asymmetry is a finding); quoting 6.43 ms in the abstract (rejected:
+  the abstract's numbers come from one campaign, the comparison's).
+  A5 — concluding D-0080 by fiat or re-running it (rejected: a re-run
+  is a campaign; concluding it would answer the criterion question
+  without data); omitting t47b (rejected: the README claims it). A6 —
+  keeping the seed and re-syncing it (rejected: that is the drift
+  generator). A7 — keeping the preamble as a boxed note (rejected: it
+  mixes reader-facing conditions with writer-facing instructions).
+  A8 — a hand-typed ladder table with a disclosure (rejected: every
+  cell in it is a value the generator already computes, and D-0064
+  named it a companion exhibit).
+- **Rationale:** the report converges on decisions, not on more
+  data. Each of the eight either removes a reason to run another
+  campaign or removes a place where prose could drift from data;
+  recording them together fixes the finish line — D-0064's gate,
+  walked in the T4.11 scoping — before the last stretch rather than
+  at its end.
+- **Consequences (edits this entry commits to; none performed in
+  it):** in-place amendment pointers to D-0064 (cross-system columns;
+  gate 2 read as landed-or-declined-with-reason), D-0058 (ladder
+  closed), D-0010 (syscall-latency consequence descoped), and D-0080
+  (status: stated-open in the report); PLAN T4.10's acceptance
+  amended to image bytes only, the M4 acceptance sentence amended per
+  the scope decision above, and T4.12's catch-up list extended by
+  these pointers; the ladder generator, the image-bytes record and
+  its script, the cross-system column with its fail-closed hash
+  check, and the A3 rewording of `write_cross_system`, each with a
+  selftest where the generator already has them; the draft edits
+  under A3–A7; the seed file's deletion after the fold. Revisit: none
+  of A1–A8 is reopened by new data before sign-off, because there
+  will be none; a reader who takes the `virtq_init` rung later
+  measures against the T4.8c pin and adds a row, not a retarget.

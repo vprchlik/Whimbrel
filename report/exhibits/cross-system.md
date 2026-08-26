@@ -14,7 +14,7 @@ E0→E4 is the comparison: two direct client-clock stamps. No E3w-derived column
 | linux | trimmed-instrumented | 60 | 783.49 ms | 1.85 ms | 781.21 ms | 267.0 µs |
 | linux | stock | 60 | 948.11 ms | 3.10 ms | 942.05 ms | 203.0 µs |
 
-Ratios below are E0→E4 medians on **RISC-V under QEMU TCG software emulation**, same host, same QEMU, both arms. Published unikernel figures (2–3 ms) and Firecracker's ~125 ms Linux boot are x86 with KVM hardware virtualization, where absolute times run roughly 5–10× lower. Those absolute numbers are not comparable to the medians in this table; the ratio is, because the emulation penalty applies to both arms.
+Ratios below are E0→E4 medians on **RISC-V under QEMU TCG software emulation**, same host, same QEMU, both arms. Published unikernel and microVM boot figures come from x86 under KVM hardware virtualization, and the medians in this table compare with none of them; the ratio is the comparable quantity, because the emulation penalty applies to both arms.
 
 - `release-fast-boot` / `trimmed` = **14.5×**
 - `release-fast-boot` / `stock` = **18.1×**

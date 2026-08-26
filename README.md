@@ -7,12 +7,11 @@ image and run in U-mode over a seven-syscall interface (`write`, `exit`,
 `sbrk`, `gettime`, `yield`, `recv`, `send`). At boot it brings up a hand-rolled
 virtio-net driver and network stack (Ethernet, ARP, IPv4, ICMP, UDP,
 TCP; smoltcp deliberately rejected) and serves one pinned HTTP
-response. The design rule everywhere: minimal and legible beats clever.
+response.
 
 The project's claims live in its measurement work: campaigns are
 pre-registered with falsifiers before they run, gates fail closed, and
-every published number regenerates from pinned git objects, never from
-the working tree.
+every published number regenerates from pinned git objects.
 
 **Status:** M0-M3 (boot, traps, paging, U-mode execution, virtio-net,
 HTTP) are done and merged. M4 (evaluation) is in progress, and it is
@@ -55,8 +54,8 @@ slice S: roughly **6–13 ms (trimmed)** and **10–20 ms (stock)** of
 E0→E4 that Whimbrel does not pay (D-0082; a bracket — two read-only
 methods agreed on direction and not on precision; not regenerable
 from the pinned CSVs). Charging a small image is a real unikernel
-property; this does not retract the ratio. This is what single-purpose
-structure buys under stated conditions, not a "fastest OS" claim.
+property; this does not retract the ratio. This is largely a result of
+the single-purpose structure.
 
 Two more measured results:
 
@@ -78,15 +77,13 @@ Two more measured results:
   interval is attributed; none exceeds 19% of the total.
 
 **What this is not.** As an operating system, Whimbrel is not
-significant: one workload, one emulated machine shape, one request
-served, then exit. The significant artifact is the measurement
-discipline and the reasoning around it. The decision log keeps the
-misses next to the wins: a headline metric retired when analysis
-showed its name promised something it did not measure, an aborted
-campaign, a published diagnosis later refuted by data already on disk
-and marked as such in place, an expectation model retired after three
-consecutive misses in the same direction. Those records are deliberate:
-they are what makes the numbers above checkable.
+very significant. It runs one workload on one emulated machine
+shape, serves one request, then exits. The major artifact is the
+measurement discipline. The decision log keeps the misses next to
+the wins: a headline metric retired when analysis showed its name
+promised something it did not measure, an aborted campaign, a
+diagnosis refuted by data already on disk, an expectation model
+retired after three consecutive misses in the same direction.
 
 ## What's in the repo
 
@@ -120,10 +117,10 @@ curl -v http://127.0.0.1:8080/   # … and fetch it from another terminal
 `just --list` shows the rest: per-gate recipes (`test-panic`,
 `test-net-tcp`, `check-utext`, …), `just debug` / `just gdb` for the
 GDB stub, and `just report-exhibits`, which regenerates every report
-table from pinned git objects; a local run's CSVs cannot become an
-exhibit. The measurement campaigns (`just bench-*`) fail closed
-anywhere but the dedicated bench host: bare metal, performance
-governor, SMT off, boost off, zero steal (D-0055).
+table from pinned git objects. The measurement campaigns
+(`just bench-*`) fail closed anywhere but the dedicated bench host:
+bare metal, performance governor, SMT off, boost off, zero steal
+(D-0055).
 
 ## Reading further
 
@@ -131,8 +128,7 @@ governor, SMT off, boost off, zero steal (D-0055).
   captioned with the exact git objects it reads and the command that
   regenerates it
 - The technical report (methodology, results, threats to validity) is
-  still in draft; the exhibits stand alone as the results record until
-  it lands.
+  still in draft.
 - [docs/DECISIONS.md](docs/DECISIONS.md): every nontrivial choice
   (alternatives, rationale, consequences, and, where it happened, the
   refutation)
