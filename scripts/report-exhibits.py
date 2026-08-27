@@ -18,6 +18,10 @@ The T4.4 exhibit comes from the `t44` tag (D-0065), kept as the
 pre-superpage pin. `ladder.md` (D-0083 A8) reads the baseline, `t44`, and after-ladder
 pins, plus the current comparison pin for the `virtq_init` row's
 E0→E4 share; declined rungs are rows carrying their reasons.
+The image-bytes column (D-0083 A2) reads `results/image-bytes.csv`
+as a git object at IMAGE_BYTES_REV and cross-checks every row's
+hash against the pin before printing; while that rev is unset the
+affected exhibits carry a pending line instead of the column.
 `cross-system-current.md` is an alias for whichever campaign
 CURRENT_COMPARISON names: the report's prose cites it wherever it
 means "the comparison"; per-campaign exhibits stay frozen.
@@ -124,6 +128,30 @@ T44_REV = "t44"
 T44_SHA_PREFIX = "83ca9f9"
 T44_BATCHES = frozenset({"20260817T052349Z-1", "20260817T052349Z-2"})
 
+# D-0083 A2: the image-bytes record. results/image-bytes.csv is written
+# on the bench host by scripts/image-bytes.py (the bytes QEMU loads per
+# pinned artifact, each file hashed against the pin's kernel_sha256 or
+# MANIFEST) and read here as a git object at IMAGE_BYTES_REV, never
+# from the working tree. While IMAGE_BYTES_REV is None the column is
+# pending and every affected exhibit says so in its caption. Once it
+# is set, a missing row or a hash that disagrees with the pin refuses
+# to generate. The column is the -kernel file only; the Linux initrd
+# is quoted beside it, never summed (D-0083 A2). T4.8 gets no column:
+# its Image-trimmed was not retained after the D-0073 rebuild.
+IMAGE_BYTES_REV: str | None = None
+IMAGE_BYTES_PATH = "results/image-bytes.csv"
+IMAGE_BYTES_FIELDS = (
+    "pin", "rev", "system", "config", "role", "artifact", "format",
+    "sha256", "pin_sha256", "file_bytes", "loaded_bytes", "segments",
+    "measured_utc", "host", "note",
+)
+IMAGE_BYTES_PENDING = (
+    "Image bytes (D-0083 A2): column pending. The record "
+    "`results/image-bytes.csv` is not yet pinned (`IMAGE_BYTES_REV` is "
+    "unset in `scripts/report-exhibits.py`); once the bench-host "
+    "measurement is committed and pinned, this table gains the column "
+    "and this line goes away."
+)
 # D-0068 dump-placement pins. Not ladder rungs; a separate exhibit.
 D68_RUN1_REV = "59e070321ab5ec30ff97830ac3f9f78577511db4"
 D68_RUN1_SHA_PREFIX = "c40945cd"
@@ -1741,6 +1769,192 @@ def write_ladder(
     return "\n".join(lines)
 
 
+def load_image_bytes(rev: str, *, show=git_show) -> list[dict]:
+    """The image-bytes record as a git object. Header must match."""
+    rows = read_csv_text(show(rev, IMAGE_BYTES_PATH), f"{rev}:{IMAGE_BYTES_PATH}")
+    got = tuple(rows[0].keys())
+    if got != IMAGE_BYTES_FIELDS:
+        raise ExhibitFail(
+            f"TEST FAIL: {rev}:{IMAGE_BYTES_PATH} header {got} != "
+            f"{IMAGE_BYTES_FIELDS}"
+        )
+    return rows
+
+
+def image_bytes_for(
+    record: list[dict], pin_label: str, rec: list[dict], system: str, config: str
+) -> dict:
+    """The record's kernel row for one arm of one pin, cross-checked
+    against that arm's kernel_sha256 in the pin's runs.csv, plus the
+    initrd row for a Linux arm. Fails closed on a missing row, a pin
+    hash that disagrees, a Linux row whose measured hash differs from
+    the pin, or a Whimbrel rebuild without a note.
+    """
+    arm = [r for r in rec if r["system"] == system and r["config"] == config]
+    if not arm:
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: no runs.csv rows for {system}/{config}"
+        )
+    if "kernel_sha256" not in arm[0]:
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} runs.csv has no kernel_sha256"
+        )
+    shas = {r["kernel_sha256"] for r in arm}
+    if len(shas) != 1:
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} {system}/{config} mixed "
+            f"kernel_sha256 {sorted(shas)}"
+        )
+    want = next(iter(shas))
+    kernel = [
+        r for r in record
+        if r["pin"] == pin_label and r["system"] == system
+        and r["config"] == config and r["role"] == "kernel"
+    ]
+    if len(kernel) != 1:
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {len(kernel)} record rows for "
+            f"{pin_label} {system}/{config} kernel, want 1 (no image-bytes "
+            "row)"
+        )
+    k = kernel[0]
+    if k["pin_sha256"] != want:
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} {system}/{config} record "
+            f"pin_sha256 {k['pin_sha256'][:12]}… does not match the pin's "
+            f"kernel_sha256 {want[:12]}…"
+        )
+    rebuilt = k["sha256"] != k["pin_sha256"]
+    if rebuilt and system != "whimbrel":
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} Linux row {config} measured "
+            "sha256 differs from the pin; only a Whimbrel kernel may be a "
+            "noted rebuild"
+        )
+    if rebuilt and not k["note"].strip():
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} {config} is a rebuild whose "
+            "sha256 differs from the pin without a note"
+        )
+    if k["format"] not in ("elf", "flat"):
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} {config} unknown format "
+            f"{k['format']!r}"
+        )
+    loaded = int(k["loaded_bytes"])
+    file_bytes = int(k["file_bytes"])
+    if loaded <= 0 or file_bytes < loaded:
+        raise ExhibitFail(
+            f"TEST FAIL: image bytes: {pin_label} {config} sizes "
+            f"loaded={loaded} file={file_bytes} are not sane"
+        )
+    initrd = None
+    if system == "linux":
+        irows = [
+            r for r in record
+            if r["pin"] == pin_label and r["system"] == system
+            and r["config"] == config and r["role"] == "initrd"
+        ]
+        if len(irows) != 1:
+            raise ExhibitFail(
+                f"TEST FAIL: image bytes: {len(irows)} initrd rows for "
+                f"{pin_label} {system}/{config}, want 1"
+            )
+        i = irows[0]
+        if i["sha256"] != i["pin_sha256"]:
+            raise ExhibitFail(
+                f"TEST FAIL: image bytes: {pin_label} {config} initrd measured "
+                "sha256 differs from the pin"
+            )
+        initrd = int(i["loaded_bytes"])
+        if initrd <= 0:
+            raise ExhibitFail(
+                f"TEST FAIL: image bytes: {pin_label} {config} initrd size is "
+                "not sane"
+            )
+    return {
+        "loaded": loaded,
+        "file": file_bytes,
+        "format": k["format"],
+        "rebuilt": rebuilt,
+        "note": k["note"].strip(),
+        "initrd": initrd,
+    }
+
+
+def fmt_bytes(n: int) -> str:
+    return f"{n:,}"
+
+
+def image_bytes_column(
+    record: list[dict], pin_label: str, rec: list[dict]
+) -> dict[str, dict]:
+    return {
+        cfg: image_bytes_for(record, pin_label, rec, sysname, cfg)
+        for sysname, cfg in T48_ARM_ORDER
+    }
+
+
+def comparison_header(col: dict[str, dict] | None) -> list[str]:
+    head = "| system | config | n | E0→E4 median | IQR | min | D_fin median |"
+    sep = "|---|---|---:|---:|---:|---:|---:|"
+    if col is None:
+        return [head, sep]
+    return [head + " image bytes |", sep + "---:|"]
+
+
+def image_bytes_cell(col: dict[str, dict] | None, cfg: str) -> str:
+    if col is None:
+        return ""
+    c = col[cfg]
+    return f" {fmt_bytes(c['loaded'])}{'†' if c['rebuilt'] else ''} |"
+
+
+def image_bytes_lines(
+    col: dict[str, dict] | None, pin_label: str, rev: str
+) -> list[str]:
+    """Caption paragraph for the column, or the pending line."""
+    if col is None:
+        return [IMAGE_BYTES_PENDING, ""]
+    parts = []
+    for _sysname, cfg in T48_ARM_ORDER:
+        c = col[cfg]
+        s = f"`{cfg}` file {fmt_bytes(c['file'])} B"
+        if c["initrd"] is not None:
+            s += f", initrd {fmt_bytes(c['initrd'])} B"
+        parts.append(s)
+    text = (
+        "Image bytes is the `-kernel` file as QEMU loads it: the sum of "
+        "`PT_LOAD` file sizes for Whimbrel's ELF, the file length for a "
+        "Linux `Image` (D-0083 A2). File lengths, with the `-initrd` cpio "
+        "the Linux arms also load and which is not summed into the "
+        "column: " + "; ".join(parts) + ". Source: `git show "
+        f"{rev}:{IMAGE_BYTES_PATH}`; each row's pin hash is checked "
+        f"against this pin's `kernel_sha256` before a cell prints."
+    )
+    rebuilt = [(cfg, col[cfg]) for _s, cfg in T48_ARM_ORDER if col[cfg]["rebuilt"]]
+    if rebuilt:
+        text += " † Not the pinned artifact: " + "; ".join(
+            f"`{cfg}` was measured on a rebuild at the pin's `git_sha` whose "
+            f"sha256 differs from the pin ({c['note']})"
+            for cfg, c in rebuilt
+        ) + "."
+    return [text, ""]
+
+
+def image_bytes_not_retained_lines(t48_rec: list[dict]) -> list[str]:
+    shas = {r.get("kernel_sha256", "") for r in t48_rec if r["config"] == "trimmed"}
+    sha = next(iter(shas)) if len(shas) == 1 else ""
+    return [
+        "Image bytes (D-0083 A2): no column for this pin. Its "
+        f"`Image-trimmed` (sha256 `{sha[:12]}…`) was overwritten by the "
+        "D-0073 rebuild and is not reproducible (the kernel's version "
+        "string is dated); the column starts at T4.8b, whose Linux "
+        "artifacts are the ones on the bench host.",
+        "",
+    ]
+
+
 def cfg_median(rec: list[dict], config: str, field: str) -> float:
     vals = [float(r[field]) for r in rec if r["config"] == config]
     if not vals:
@@ -1760,6 +1974,7 @@ def write_cross_system(
     t46_phases: list[dict],
 ) -> str:
     """T4.8 comparison table. No E3w-derived column. No W next to Linux."""
+    col = None  # D-0083 A2: T4.8's Image-trimmed was not retained
     e4 = {
         cfg: cfg_median(t48_rec, cfg, "e0_to_e4_ns") for _sys, cfg in T48_ARM_ORDER
     }
@@ -1802,8 +2017,7 @@ def write_cross_system(
         "",
         "### Comparison (E0→E4)",
         "",
-        "| system | config | n | E0→E4 median | IQR | min | D_fin median |",
-        "|---|---|---:|---:|---:|---:|---:|",
+        *comparison_header(col),
     ]
     for sys, cfg in T48_ARM_ORDER:
         rows = [r for r in t48_rec if r["config"] == cfg]
@@ -1814,9 +2028,11 @@ def write_cross_system(
         lines.append(
             f"| {sys} | {cfg} | {len(rows)} | {fmt_ns(med)} | "
             f"{fmt_ns(iq)} | {fmt_ns(mn)} | {fmt_ns(dmed)} |"
+            + image_bytes_cell(col, cfg)
         )
     lines.extend(
         [
+            *image_bytes_not_retained_lines(t48_rec),
             "",
             "Ratios below are E0→E4 medians on **RISC-V under QEMU TCG "
             "software emulation**, same host, same QEMU, both arms. "
@@ -1919,9 +2135,16 @@ def write_cross_system_t48b(
     t48b_phases: list[dict],
     t48_rec: list[dict],
     t48_phases: list[dict],
+    *,
+    image_bytes: list[dict] | None = None,
 ) -> str:
     """T4.8b comparison + the D-0073 before/after. Same shape rules as
     T4.8: no E3w-derived column, no W next to Linux."""
+    col = (
+        image_bytes_column(image_bytes, "T4.8b", t48b_rec)
+        if image_bytes is not None
+        else None
+    )
     e4b = {
         cfg: cfg_median(t48b_rec, cfg, "e0_to_e4_ns")
         for _sys, cfg in T48_ARM_ORDER
@@ -1970,8 +2193,7 @@ def write_cross_system_t48b(
         "",
         "### Comparison (E0→E4)",
         "",
-        "| system | config | n | E0→E4 median | IQR | min | D_fin median |",
-        "|---|---|---:|---:|---:|---:|---:|",
+        *comparison_header(col),
     ]
     for sys, cfg in T48_ARM_ORDER:
         rows = [r for r in t48b_rec if r["config"] == cfg]
@@ -1982,9 +2204,11 @@ def write_cross_system_t48b(
         lines.append(
             f"| {sys} | {cfg} | {len(rows)} | {fmt_ns(med)} | "
             f"{fmt_ns(iq)} | {fmt_ns(mn)} | {fmt_ns(dmed)} |"
+            + image_bytes_cell(col, cfg)
         )
     lines.extend(
         [
+            *image_bytes_lines(col, "T4.8b", IMAGE_BYTES_REV or ""),
             "",
             "Ratios are E0→E4 medians under TCG; the emulation penalty "
             "applies to both arms (see the T4.8 exhibit for the "
@@ -2100,12 +2324,18 @@ def write_cross_system_t48c(
     t48b_phases: list[dict],
     *,
     manifest_text: str,
+    image_bytes: list[dict] | None = None,
 ) -> str:
     """T4.8c comparison + the D-0081 before/after against t48b.
 
     Same table columns as cross-system-t48b.md. Every displayed
     quantity is computed from the two pins.
     """
+    col = (
+        image_bytes_column(image_bytes, "T4.8c", t48c_rec)
+        if image_bytes is not None
+        else None
+    )
     e4c = {
         cfg: cfg_median(t48c_rec, cfg, "e0_to_e4_ns")
         for _sys, cfg in T48_ARM_ORDER
@@ -2209,8 +2439,7 @@ def write_cross_system_t48c(
         "",
         "### Comparison (E0→E4)",
         "",
-        "| system | config | n | E0→E4 median | IQR | min | D_fin median |",
-        "|---|---|---:|---:|---:|---:|---:|",
+        *comparison_header(col),
     ]
     for sys, cfg in T48_ARM_ORDER:
         rows = [r for r in t48c_rec if r["config"] == cfg]
@@ -2221,9 +2450,11 @@ def write_cross_system_t48c(
         lines.append(
             f"| {sys} | {cfg} | {len(rows)} | {fmt_ns(med)} | "
             f"{fmt_ns(iq)} | {fmt_ns(mn)} | {fmt_ns(dmed)} |"
+            + image_bytes_cell(col, cfg)
         )
     lines.extend(
         [
+            *image_bytes_lines(col, "T4.8c", IMAGE_BYTES_REV or ""),
             "",
             "Ratios are E0→E4 medians under TCG; the emulation penalty "
             "applies to both arms (see the T4.8 exhibit for the "
@@ -2319,7 +2550,9 @@ def current_comparison_entry(
     return lineage[-1]
 
 
-def write_cross_system_current(cur_rec: list[dict], *, entry: tuple) -> str:
+def write_cross_system_current(
+    cur_rec: list[dict], *, entry: tuple, image_bytes: list[dict] | None = None
+) -> str:
     """The current-comparison alias (cross-system-current.md).
 
     Lineage header plus the current E0→E4 table and ratios, computed
@@ -2332,6 +2565,11 @@ def write_cross_system_current(cur_rec: list[dict], *, entry: tuple) -> str:
     """
     label, rev, batches, sha_prefix, n_per_arm, exhibit = entry
     got_batches = {r["batch_id"] for r in cur_rec}
+    col = (
+        image_bytes_column(image_bytes, label, cur_rec)
+        if image_bytes is not None
+        else None
+    )
     if got_batches != set(batches):
         raise ExhibitFail(
             f"TEST FAIL: current comparison {label} batch_id set "
@@ -2399,8 +2637,7 @@ def write_cross_system_current(cur_rec: list[dict], *, entry: tuple) -> str:
         "",
         "### Comparison (E0→E4)",
         "",
-        "| system | config | n | E0→E4 median | IQR | min | D_fin median |",
-        "|---|---|---:|---:|---:|---:|---:|",
+        *comparison_header(col),
     ]
     for sysname, cfg in T48_ARM_ORDER:
         rows = [r for r in cur_rec if r["config"] == cfg]
@@ -2411,9 +2648,11 @@ def write_cross_system_current(cur_rec: list[dict], *, entry: tuple) -> str:
         lines.append(
             f"| {sysname} | {cfg} | {len(rows)} | {fmt_ns(med)} | "
             f"{fmt_ns(iq)} | {fmt_ns(mn)} | {fmt_ns(dmed)} |"
+            + image_bytes_cell(col, cfg)
         )
     lines.extend(
         [
+            *image_bytes_lines(col, label, IMAGE_BYTES_REV or ""),
             "",
             "Ratios are E0→E4 medians under TCG; the emulation "
             "penalty applies to both arms (KVM-comparability caveat "
@@ -4475,6 +4714,14 @@ def cmd_selftest() -> int:
         "alias history-as-current",
     )
 
+    alias_kernel_sha = {
+        FAST: "a" * 64,
+        SAFE: "b" * 64,
+        "trimmed": "c" * 64,
+        "trimmed-instrumented": "c" * 64,
+        "stock": "d" * 64,
+    }
+
     def alias_run(cfg: str, sysname: str, batch: str) -> dict:
         return {
             "batch_id": batch,
@@ -4484,6 +4731,7 @@ def cmd_selftest() -> int:
             "git_sha": "cafe1234deadbeef",
             "e0_to_e4_ns": "1000",
             "d_fin_ns": "10",
+            "kernel_sha256": alias_kernel_sha[cfg],
         }
 
     alias_entry = (
@@ -4550,6 +4798,110 @@ def cmd_selftest() -> int:
         ),
         "git show",
         "alias missing-CSV pin (git_show fails closed)",
+    )
+
+    # --- image-bytes column (D-0083 A2) ---
+    def ib_row(
+        cfg: str, sysname: str, role: str, sha: str, loaded: int, file: int,
+        note: str = "", measured: str | None = None,
+    ) -> dict:
+        return {
+            "pin": "T4.Xf",
+            "rev": "fixture-rev",
+            "system": sysname,
+            "config": cfg,
+            "role": role,
+            "artifact": "fixture",
+            "format": "elf" if sysname == "whimbrel" else "flat",
+            "sha256": measured if measured is not None else sha,
+            "pin_sha256": sha,
+            "file_bytes": str(file),
+            "loaded_bytes": str(loaded),
+            "segments": "2" if sysname == "whimbrel" else "",
+            "measured_utc": "2026-01-01T00:00:00Z",
+            "host": "fixture-host",
+            "note": note,
+        }
+
+    ib_rec: list[dict] = []
+    for sysname, cfg in T48_ARM_ORDER:
+        sha = alias_kernel_sha[cfg]
+        if sysname == "whimbrel":
+            ib_rec.append(ib_row(cfg, sysname, "kernel", sha, 300, 400))
+        else:
+            ib_rec.append(ib_row(cfg, sysname, "kernel", sha, 9000, 9000))
+            ib_rec.append(ib_row(cfg, sysname, "initrd", "9" * 64, 500, 500))
+
+    def ib_write(record: list[dict] | None) -> str:
+        return write_cross_system_current(
+            alias_rec, entry=alias_entry, image_bytes=record
+        )
+
+    ib_text = ib_write(ib_rec)
+    if "| image bytes |" not in ib_text or "| 9,000 |" not in ib_text:
+        raise ExhibitFail("TEST FAIL: image-bytes column missing from a clean fixture")
+    if "initrd 500 B" not in ib_text:
+        raise ExhibitFail("TEST FAIL: initrd bytes missing from the caption")
+    fired.append("write_cross_system_current prints the image-bytes column from a clean record")
+    ib_pending = ib_write(None)
+    if "column pending" not in ib_pending or "| image bytes |" in ib_pending:
+        raise ExhibitFail("TEST FAIL: pending line missing when the record is not pinned")
+    fired.append("write_cross_system_current prints the pending line without a record")
+    ib_missing = [
+        r for r in ib_rec if not (r["config"] == "stock" and r["role"] == "kernel")
+    ]
+    expect_fail(
+        lambda: ib_write(ib_missing), "no image-bytes row", "image bytes planted missing size",
+    )
+    ib_badpin = [
+        dict(r, pin_sha256="0" * 64, sha256="0" * 64) if r["config"] == FAST else r
+        for r in ib_rec
+    ]
+    expect_fail(
+        lambda: ib_write(ib_badpin), "does not match the pin", "image bytes planted hash mismatch",
+    )
+    ib_unnoted = [dict(r, sha256="1" * 64) if r["config"] == FAST else r for r in ib_rec]
+    expect_fail(
+        lambda: ib_write(ib_unnoted), "without a note", "image bytes planted unnoted rebuild",
+    )
+    ib_noted = [
+        dict(r, sha256="1" * 64, note="rustc 0.0.0 on fixture-host")
+        if r["config"] == FAST else r
+        for r in ib_rec
+    ]
+    ib_noted_text = ib_write(ib_noted)
+    if "300† |" not in ib_noted_text or "Not the pinned artifact" not in ib_noted_text:
+        raise ExhibitFail("TEST FAIL: noted rebuild not marked and disclosed")
+    fired.append("a noted Whimbrel rebuild is marked in the cell and disclosed in the caption")
+    ib_linux = [
+        dict(r, sha256="2" * 64)
+        if r["config"] == "stock" and r["role"] == "kernel" else r
+        for r in ib_rec
+    ]
+    expect_fail(
+        lambda: ib_write(ib_linux), "Linux row", "image bytes planted Linux measured-hash mismatch",
+    )
+    ib_noinitrd = [r for r in ib_rec if r["role"] != "initrd"]
+    expect_fail(
+        lambda: ib_write(ib_noinitrd), "initrd rows", "image bytes planted missing initrd row",
+    )
+    ib_badsize = [
+        dict(r, loaded_bytes="500", file_bytes="400") if r["config"] == FAST else r
+        for r in ib_rec
+    ]
+    expect_fail(
+        lambda: ib_write(ib_badsize), "not sane", "image bytes planted loaded > file",
+    )
+    expect_fail(
+        lambda: load_image_bytes("x", show=lambda rev, path: "a,b\n1,2\n"),
+        "header",
+        "load_image_bytes refuses a wrong header",
+    )
+    no_sha_rec = [{k: v for k, v in r.items() if k != "kernel_sha256"} for r in alias_rec]
+    expect_fail(
+        lambda: write_cross_system_current(no_sha_rec, entry=alias_entry, image_bytes=ib_rec),
+        "no kernel_sha256",
+        "image bytes refuses a pin without kernel_sha256",
     )
 
     print("TEST PASS: report-exhibits fail-closed selftest")
@@ -4635,6 +4987,9 @@ def main() -> int:
             f"{T47_REV}:results/phases.csv",
         )
         validate_t47(t47_runs, t47_phases)
+        image_bytes = (
+            load_image_bytes(IMAGE_BYTES_REV) if IMAGE_BYTES_REV else None
+        )
         t44_rec, t44_phases = load_pin(
             T44_REV, T44_BATCHES, T44_SHA_PREFIX, "T4.4"
         )
@@ -4695,7 +5050,8 @@ def main() -> int:
         )
         (OUT_DIR / "cross-system-t48b.md").write_text(
             write_cross_system_t48b(
-                t48b_rec, t48b_phases, t48_rec, t48_phases
+                t48b_rec, t48b_phases, t48_rec, t48_phases,
+                image_bytes=image_bytes,
             ),
             encoding="utf-8",
             newline="\n",
@@ -4707,6 +5063,7 @@ def main() -> int:
                 t48b_rec,
                 t48b_phases,
                 manifest_text=t48c_manifest,
+                image_bytes=image_bytes,
             ),
             encoding="utf-8",
             newline="\n",
@@ -4717,7 +5074,9 @@ def main() -> int:
             f"{cur_entry[1]}:results/runs.csv",
         )
         (OUT_DIR / "cross-system-current.md").write_text(
-            write_cross_system_current(recorded(cur_runs), entry=cur_entry),
+            write_cross_system_current(
+                recorded(cur_runs), entry=cur_entry, image_bytes=image_bytes
+            ),
             encoding="utf-8",
             newline="\n",
         )
@@ -4774,6 +5133,11 @@ def main() -> int:
         print((OUT_DIR / "linux-decomposition.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "t47-firmware.md").read_text(encoding="utf-8"))
         print((OUT_DIR / "ladder.md").read_text(encoding="utf-8"))
+        print(
+            "image bytes: "
+            + (f"from {IMAGE_BYTES_REV}" if IMAGE_BYTES_REV else
+               "column pending (IMAGE_BYTES_REV unset; D-0083 A2)")
+        )
         return 0
     except ExhibitFail as e:
         print(e, file=sys.stderr)

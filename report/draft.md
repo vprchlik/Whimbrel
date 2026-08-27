@@ -1506,13 +1506,19 @@ answer is open (Threats).
 D-0083 added one column to the cross-system table without a
 campaign: image bytes, the bytes QEMU loads from the `-kernel` file
 (the sum of `PT_LOAD` sizes for Whimbrel's ELF, the file length for
-a Linux `Image`), from a committed record that measures each pinned
-artifact and verifies its sha256, with the generator failing closed
-on a missing size or a hash mismatch. At this draft it has not
-landed: the record, its script, and the column do not exist yet. It
-is the remaining bench-host task before sign-off, a measurement of
-files rather than a boot, and it puts a number beside the D-0082
-bracket for the image-size component of S.
+a Linux `Image`). The machinery has landed: `scripts/image-bytes.py`
+measures each pinned artifact on the bench host, refuses any file
+whose sha256 is not the pin's, and writes `results/image-bytes.csv`;
+the generator reads that record as a git object at its own pin and
+checks every row's hash against the pin's `kernel_sha256` again
+before a cell prints. The Linux arms' `rootfs.cpio` is recorded as
+its own initrd row and quoted in the caption, never summed into the
+column. Until the record is committed and pinned, the T4.8b, T4.8c,
+and current-comparison exhibits carry a pending line in place of the
+column; the measurement itself is the remaining bench-host task, a
+measurement of files rather than a boot. T4.8's `Image-trimmed` was
+overwritten by the D-0073 rebuild and is not reproducible, so that
+exhibit carries no column and says so.
 
 ---
 

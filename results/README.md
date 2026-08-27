@@ -286,6 +286,27 @@ Fail closed on the header:
 Do not copy S into `results/baseline-summary.txt` unless the freeze
 is retaken on a new machine. The freeze object stays frozen.
 
+### Image-bytes record (D-0083 A2)
+
+`results/image-bytes.csv` is written on the bench host by
+`python3 scripts/image-bytes.py measure` and committed; it is the only
+size record the report reads. One row per (pin, arm, role): `role`
+is `kernel` (the `-kernel` file) or `initrd` (the Linux `rootfs.cpio`,
+quoted beside the column and never summed into it). `loaded_bytes`
+is what QEMU copies into guest memory: the sum of `PT_LOAD` file
+sizes for Whimbrel's ELF, the file length for a flat `Image`;
+`file_bytes` is the file length. `pin_sha256` is the arm's
+`kernel_sha256` from the pin's `runs.csv` (or the MANIFEST hash for
+the cpio); `sha256` is the measured file. They are equal except for a
+Whimbrel kernel rebuilt at the pin's `git_sha` under a toolchain that
+no longer reproduces the pin, recorded only with
+`--allow-rebuild --note`, which the exhibit discloses. Linux Images
+must match the pin. `python3 scripts/image-bytes.py verify` re-checks
+a record against the pins anywhere git runs. The generator reads the
+record as a git object at `IMAGE_BYTES_REV`, never from the working
+tree. T4.8's `Image-trimmed` was overwritten by the D-0073 rebuild
+and is not reproducible; that exhibit carries no column.
+
 ### Stability and summary
 
 `metric_table` / `just bench-summary` / two-batch stability:

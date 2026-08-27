@@ -13,6 +13,8 @@ E0→E4 is the comparison: two direct client-clock stamps. No E3w-derived column
 | linux | trimmed | 60 | 759.79 ms | 2.61 ms | 757.10 ms | 240.5 µs |
 | linux | trimmed-instrumented | 60 | 783.49 ms | 1.85 ms | 781.21 ms | 267.0 µs |
 | linux | stock | 60 | 948.11 ms | 3.10 ms | 942.05 ms | 203.0 µs |
+Image bytes (D-0083 A2): no column for this pin. Its `Image-trimmed` (sha256 `fe821d1d5fcc…`) was overwritten by the D-0073 rebuild and is not reproducible (the kernel's version string is dated); the column starts at T4.8b, whose Linux artifacts are the ones on the bench host.
+
 
 Ratios below are E0→E4 medians on **RISC-V under QEMU TCG software emulation**, same host, same QEMU, both arms. Published unikernel and microVM boot figures come from x86 under KVM hardware virtualization, and the medians in this table compare with none of them; the ratio is the comparable quantity, because the emulation penalty applies to both arms.
 

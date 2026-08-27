@@ -13,6 +13,8 @@ Both Linux arms run the D-0075 `/init`: one RTM_SETNEIGHTBL round trip before th
 | linux | trimmed | 60 | 284.68 ms | 1.66 ms | 283.09 ms | 218.5 µs |
 | linux | trimmed-instrumented | 60 | 310.97 ms | 1.93 ms | 308.82 ms | 188.5 µs |
 | linux | stock | 60 | 948.10 ms | 4.27 ms | 940.74 ms | 170.0 µs |
+Image bytes (D-0083 A2): column pending. The record `results/image-bytes.csv` is not yet pinned (`IMAGE_BYTES_REV` is unset in `scripts/report-exhibits.py`); once the bench-host measurement is committed and pinned, this table gains the column and this line goes away.
+
 
 Ratios are E0→E4 medians under TCG; the emulation penalty applies to both arms (see the T4.8 exhibit for the KVM-comparability caveat, unchanged):
 
