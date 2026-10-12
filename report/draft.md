@@ -409,8 +409,9 @@ stability-gated by construction and its Claim B is per batch (Shim
 lane, below). One campaign, t47b, aborted at this gate on its
 E0-side edge and published nothing; D-0080 registered a
 characterization of that drift, whose first run was invalidated by
-an instrument defect and has not been repeated (Threats). The
-criterion failed on a KVM pod, and nothing from that pod is cited.
+an instrument defect and has not been repeated (Threats items 22 and
+23). The criterion failed on a KVM pod, and nothing from that pod is
+cited.
 
 D-0068 ran twice: four batches, two invocations, different seeds,
 kernels one CSV commit apart;
@@ -1453,6 +1454,22 @@ maintained in [threats-to-validity.md](threats-to-validity.md).
     compares within a campaign, and the regime is uniform within
     each; a mid-campaign flip would remain visible at trial grain
     in the safe arm's own witness, and none has been observed.
+22. **E0-side drift (D-0080), stated open.** The batch-to-batch
+    movement of first-connect that aborted t47b was registered for
+    characterization, and the instrument's first run was invalid, an
+    unpaced runner sampling at roughly 1000× its registered cadence;
+    the redesign is drafted, not implemented, and the run has not
+    been repeated. What D-0055's stability criterion should do about
+    drift on the E0 side is undecided, and the item is carried in
+    Future work.
+23. **The t47b abort, stated open.** A T4.7-shaped campaign aborted
+    at the D-0055 stability gate on its E0-side edge, one arm's
+    first-connect medians crossing the 2% tolerance between batches,
+    and published nothing; its rows are retained as evidence in
+    [exhibits/regime-witness.md](exhibits/regime-witness.md), where
+    its canary disagreement is part of item 21's record. The gate
+    fired as registered, and the drift it fired on is item 22's
+    question (Future work).
 
 ---
 
@@ -1501,7 +1518,7 @@ cadence and the session took about 30 s against a registered 35 to
 enforces the cadence from recorded timestamps and refuses compressed
 timestamps in its selftest is drafted and not implemented; the run
 has not been repeated, and the question the entry was registered to
-answer is open (Threats).
+answer is open (Threats item 22).
 
 D-0083 added one column to the cross-system table without a
 campaign: image bytes, the bytes QEMU loads from the `-kernel` file
