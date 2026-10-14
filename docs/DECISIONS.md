@@ -198,6 +198,11 @@ D-0011 onward are working decisions made under those constraints.
   discuss the forgone function-call design as future work; the 5-call
   interface is a hard wall — any app need not expressible in it becomes a
   decision entry, not a sixth syscall added casually.
+- **Amendment (2026-10-13, D-0083 A2):** the consequence "M4 must
+  report syscall latency as trap-based" is descoped and not met: the
+  trap-path-versus-vDSO exhibit PLAN T4.10 planned is not measured,
+  and the report's future work carries the forgone measurement.
+  D-0083 carries the decision.
 
 ---
 
@@ -1402,6 +1407,15 @@ D-0011 onward are working decisions made under those constraints.
   curl-after-`HTTP READY` path stays a correctness gate. Release LTO
   constant-folds `==` of distinct linker symbols (DEBUGGING.md §4.14);
   `task::pa` / page / virtq address helpers `black_box` those loads.
+- **Amendment (2026-10-13, second-audit note, `docs/AUDIT-2026-10.md`
+  finding 15):** the E2 offset above has not been re-measured under
+  the pinned M4 QEMU, though this entry's re-measure trigger (a QEMU
+  version change) has fired. `scripts/measure-e2.sh` labels the reset
+  `pc` it asserts as OpenSBI, while that address is QEMU `virt`'s
+  reset vector under any `-bios`, and no recipe runs it under the
+  D-0079 shim. The re-measurement is item 8e of
+  `docs/RUNBOOK-bench-host-2026-10-13.md`; a nonzero offset would
+  change the report's E2 definition.
 
 ## D-0044: App crate in the user sections; check-utext bans FP, including compressed
 - Date: 2026-08-15 — Status: accepted
@@ -1769,6 +1783,15 @@ D-0011 onward are working decisions made under those constraints.
   FIN after LISTEN is dropped, not RST, so the happy-path capture
   stays RST-free (the hostfwd watcher and a retransmitted peer FIN
   share that pcap).
+- **Amendment (2026-10-13, second-audit note, `docs/AUDIT-2026-10.md`
+  finding 22):** `scripts/assert-pcap-http.sh`, the `just test` pcap
+  assertion that checks this entry's RST-free happy path, reads a
+  `tshark` failure as "no RST": `run_fields`'s `exit 1` runs inside a
+  command substitution and ends only the subshell, and the RST query
+  pipes through `awk` and `|| true`. A later query still fails the
+  gate, on a line that does not name the cause, and `want_ack` is
+  computed and printed but never compared. The campaign's RST gate
+  is `scripts/pcap_http.py`, independent of this script. Not fixed.
 
 ## D-0054: ARP for the gateway at init; do not wait to be asked
 - Date: 2026-08-16 — Status: accepted
@@ -1978,6 +2001,24 @@ D-0011 onward are working decisions made under those constraints.
   broken build must FAIL every gate. Incident record and the first
   audit of the live registrations against this rule: D-0080, first
   execution (2026-08-20).
+- **Amendment (2026-10-13, second-audit notes, `docs/AUDIT-2026-10.md`
+  findings 17, 19, and 24):** three harness facts, recorded and not
+  fixed; none changes a published number (the audit's counts).
+  (1) The campaign path does not require QEMU to exit 0:
+  `scripts/bench.py` captures QEMU's return code and nothing reads
+  it, and `runs.csv` has no column for it, where
+  `scripts/boot-test.sh` requires exit 0 for PASS (finding 17).
+  (2) Standalone `summarize` (`just bench-summary`) enforces no trial
+  counts, and `runs.csv` is rewritten after every trial, so an
+  aborted campaign's partial CSV can pass the summary with unequal
+  batches; the campaign path gates the counts at launch and the
+  exhibit generator refuses a wrong count, so the methodology
+  amendment above holds on those two paths only (finding 19).
+  (3) `dirty`, the host-control columns, and `loadavg_1m` are
+  launch-time snapshots copied to every row, so `dirty=0` means
+  clean at launch and the aggregation uniformity checks cannot fail
+  inside one campaign; steal is the control re-read per trial
+  (finding 24).
 
 ## D-0056: Pre-baseline corrections (T4.0b)
 - Date: 2026-08-16 — Status: accepted
@@ -2219,6 +2260,12 @@ D-0011 onward are working decisions made under those constraints.
   E3w→E4 was open when this was written; D-0070/D-0071 later
   resolved it as a mislabeling (QEMU startup + guest boot wait),
   not a host term a rung could take.
+- **Amendment (2026-10-13, D-0083 A1):** the ladder is closed, with
+  `virtq_init` declined on this entry's decline-with-reason path as
+  a stopping decision while it still clears the 5% bar, so the
+  closure is not the floor declaration this entry expected. D-0083
+  carries the decision, and `report/exhibits/ladder.md` carries the
+  rows.
 
 ## D-0059: 2 MiB superpages for the RAM interior (amends D-0026)
 - Date: 2026-08-16 — Status: accepted (measured 2026-08-17; batches
@@ -2904,6 +2951,13 @@ D-0011 onward are working decisions made under those constraints.
   TCG-trace secondaries as a matched pair under item 16; D-0068
   dump occupancy tested and not confirmed; E3w→E4 open) is
   maintained in the draft from day one.
+- **Amendment (2026-10-13, D-0083 A1 and A2):** the cross-system
+  columns are amended to system × E0→first-connect, E0→E4, image
+  bytes (the bytes QEMU loads from the `-kernel` file, as A2 defines
+  them); median/IQR/min; N stated, with RAM dropped; and gate 2's
+  "ladder closed by the 5% bar" is read as every rung
+  landed-with-row or declined-with-reason. D-0083 carries both
+  decisions.
 
 ## D-0065: Bump-pointer / lazy free list (T4.4; amends D-0019)
 - Date: 2026-08-17 — Status: accepted
@@ -4184,6 +4238,38 @@ D-0011 onward are working decisions made under those constraints.
     hoped-for improvement into a **falsifier** — a rate move beyond
     the pre-registered 2× means the intervention perturbed the race
     itself, and pre/post are then not comparable.
+- **Amendment (2026-10-13, second audit finding 33: Threats item 19's
+  figures re-homed before D-0083 A6 deletes the seed):**
+  `docs/AUDIT-2026-10.md` finding 33 found five figures in the
+  draft's Threats item 19 whose only committed source is
+  `report/threats-to-validity.md`, the seed D-0083 A6 deletes; the
+  sentences entered that file in `2aae7d8`, the commit that recorded
+  this entry. Three are carried here, each in the seed sentence that
+  states what it was measured from, copied verbatim from
+  `report/threats-to-validity.md` at `bc931e6`:
+  - "+39 to +125 ms" (lines 146-149): "On the T4.8 pin (`ffb7ac7`),
+    the largest E0→E4 / `W` excursions (+39, +52, +115, +125 ms)
+    were **slow guest boots** — `/init`'s announce stamp late by the
+    same amount, pcap first-TX minus announce normal — not delivery
+    faults."
+  - "≤ 7.7 ms" (lines 149-153): "T4.8's egress-attributed tail is
+    ≤ 7.7 ms (stock) and ≤ 4.3 ms (trimmed arms), established
+    read-only by splitting `W` at the `/init` CLOCK_MONOTONIC stamps
+    against pcap first-TX over the recorded per-trial artifacts."
+  - "flat to 0.56 ms over ~400 boots" (lines 233-237): "Its
+    [D-0056.3's removal of the `wfi` from the boot RX waits] side
+    effect is that a held first-TX frame becomes visible in guest
+    time at 100 ns grain: `first_rx − DRIVER_OK` stayed flat to
+    0.56 ms worst-case across ~400 boots, the independent bound on
+    Whimbrel's egress tail."
+  The other two figures finding 33 names are not carried, because
+  their seed sentences do not say what they were measured from; the
+  T4.11 revision drops them from the draft. The seed does not name
+  the campaigns behind the third figure's "~400 boots". That figure
+  is a bound read through Whimbrel's guest stamps, a separate claim
+  from the "~400 boots" absence-of-stall sentence this entry withdrew
+  as robustness evidence. No published median, delta, or exhibit
+  changes.
 
 
 
@@ -6321,6 +6407,23 @@ D-0011 onward are working decisions made under those constraints.
   it loudly); or the seams demanding a change outside D-0061's
   allowlist, which is abandon criterion (a) and ends the variant
   rather than widening it.
+- **Amendment (2026-10-13, second-audit notes, `docs/AUDIT-2026-10.md`
+  findings 13, 14, 16, and 18):** (1) `scripts/bench.py` sets
+  `QEMU_BIOS` only for shim arms and `scripts/qemu-args.sh` falls back
+  to `default`, so a `QEMU_BIOS` exported in the launching shell would
+  put the blob under every arm and the canary while OpenSBI rows
+  record an empty `bios_sha256`, and no row records the actual
+  `-bios` argument. The default kernel and Linux need SBI, so such a
+  trial fails loudly and the gap is an unrecorded control (finding
+  13). (2) The shim-lane kernels are `bios-none` feature builds with
+  their own `kernel_sha256`, so "the S-mode kernel booted at
+  skeleton stage is the byte-identical campaign binary" holds for the
+  skeleton only. That the lane kernel differs from the default only
+  at the cfg seams holds by construction of the feature flags, and
+  no gate asserts it (finding 14). (3) The other seams and the CSR
+  program match this entry as written (finding 16). (4) The
+  `gate-failures.csv` rotation proposed above is still not
+  implemented, and readers filter by `batch_id` (finding 18).
 
 ## D-0080: E0-side drift — characterize it, then decide what D-0055's stability criterion does
 
@@ -6865,6 +6968,12 @@ D-0011 onward are working decisions made under those constraints.
   anywhere in the gate suite (rule 5's clause); or any future
   campaign aborting on a pre-guest control before this probe has
   run, which converts this entry from scheduled to urgent.
+- **Amendment (2026-10-13, D-0083 A5):** the report states this
+  entry as open: instrument defect found on first execution,
+  redesign drafted and not implemented, not re-run, and the question
+  of what D-0055's stability criterion does about E0-side drift
+  unanswered (draft Threats item 22). D-0083 carries the decision,
+  and its scope decision rules out the re-run before sign-off.
 
 ## D-0081: Skip the unaligned-access probe on the Linux cmdline; T4.8c re-run
 - Date: 2026-08-21 — Status: accepted (pre-registered 2026-08-21
@@ -7316,3 +7425,236 @@ D-0011 onward are working decisions made under those constraints.
   of A1–A8 is reopened by new data before sign-off, because there
   will be none; a reader who takes the `virtq_init` rung later
   measures against the T4.8c pin and adds a row, not a retarget.
+- **Amendment (2026-10-13, A3 reopened by D-0084):** A3's decision
+  against a related-work section and a reference list is replaced by
+  D-0084 (option (i), accepted 2026-10-13): a Related work section, a
+  References section, and a citation record. A3's removal of the two
+  uncited figures stands, and D-0084 carries the rest of the
+  decision.
+- **Amendment (2026-10-13, second-audit notes, `docs/AUDIT-2026-10.md`
+  section 5 and findings 4 and 5):** the consequences above as the
+  audit marked them, for the items T4.12 owns. The four amendment
+  pointers (finding 39) are appended to D-0064, D-0058, D-0010, and
+  D-0080, and PLAN's T4.10 acceptance, its M4 acceptance sentence,
+  and T4.12's catch-up list are amended (finding 40), all on
+  2026-10-13. A1 and A7 are performed (findings 41 and 47). A3 is
+  performed in the draft and the generator and not in `README.md`
+  (finding 43); that line is the T4.11 revision's under D-0084. The
+  byte-identical reproduction the scope decision names spans three
+  generators, while `just report-exhibits` runs one:
+  `report/exhibits/regime-witness.md` and
+  `report/exhibits/d0070-pcap.md` come from
+  `scripts/regime-witness.py` and `scripts/d0070-pcap-pass.py`
+  (finding 4), and PLAN's amended M4 acceptance names all three. The
+  three failing-input selftests pass on Windows (finding 5).
+
+## D-0084: Reopen D-0083 A3: a related-work section with a reference list
+- Date: 2026-10-13    Status: accepted: option (i), 2026-10-13
+- **Context:** D-0083 A3 (2026-08-24) took two uncited external
+  figures and their ratio gloss out of the draft and decided against
+  a related-work survey and a reference list, because the figures'
+  sources were never recorded and uncited numbers are worse than no
+  numbers. The report is now to be posted as a technical report with
+  a DOI (D-0085). A reader in the field first asks where it sits
+  beside the published unikernel and microVM boot studies, and the
+  draft answers with one uncited sentence, written twice (Background;
+  Results, Cross-system): published figures "come from x86 under KVM
+  hardware virtualization". A reading of the sources at their origin,
+  done for this entry, found that sentence narrower than the sources:
+  Firecracker's specified boot bound covers an AWS M5D.metal and an
+  M6G.metal instance, and Firecracker supports x86_64 and aarch64
+  hosts (Firecracker's `SPECIFICATION.md` and getting-started guide
+  at commit `fd9fc7a`).
+- **Decision:** add a "Related work" section after Background, a
+  "References" section before Appendices, and a citation-record
+  appendix: nine references, each read at its source on 2026-10-13,
+  with the passage relied on and the time read recorded. The two A3
+  sentences become cited and widen from "x86" to "x86_64 or
+  aarch64".
+- **Alternatives considered:**
+  (ii) Keep A3 as decided: no section, no reference list, the two A3
+  sentences uncited. Its case: *Scope.* D-0083 closed eight
+  decisions to fix the finish line; reopening one adds a section, a
+  References block, an appendix, a generator prose change, and an
+  exhibit regeneration in the last stretch before a dated posting.
+  *Defensibility.* The citations rest partly on project
+  documentation and abstracts: ACM-hosted papers (Unikraft's own
+  text, LightVM, MirageOS) could not be read at their origin for this
+  entry, so the section cites Unikraft through its arXiv abstract and
+  artifact repository and omits LightVM and MirageOS, an omission a
+  field reader may hold against a reference list that exists. A list
+  that looks thin invites the survey critique A3 avoided by having
+  none. *Legibility.* No claim in the report depends on any cited
+  work; the comparison is internal (same host, same QEMU), and the
+  Background sentence already tells the reader not to compare
+  absolutes. Printing Unikraft's and Firecracker's figures in the
+  same document as Whimbrel's absolutes invites the comparison the
+  report forbids, conditions clause or not. Rejected by the owner on
+  2026-10-13 for the reasons under Rationale; its scope cost is
+  accepted under Consequences.
+  (a) A survey (LightVM, ClickOS, MirageOS, OSv, IncludeOS,
+  Unikernels as Processes, HermitCore, snapshot restore). Rejected:
+  it is the "literature dump that outruns the apparatus" D-0083
+  already refused, and most of these could not be read at source, or
+  were read and found to carry no boot figure with its conditions.
+  (b) Citations inline in Background and Cross-system, no section.
+  Rejected: the number-with-conditions rule makes each citation a
+  long sentence, and the two places would carry two copies of it;
+  one section that both sentences point to is shorter.
+  (c) The section with no external number in it. Rejected: it would
+  answer "which studies" and leave out "what magnitudes", and a
+  figure printed with its conditions is what shows the reader why it
+  does not compare.
+  (d) Restoring A3's two figures with citations. Rejected: no source
+  read here gives A3's unikernel figure as a unikernel boot time
+  (Unikraft's abstract gives a guest figure on top of the VMM's time
+  and a total range), and the ratio gloss set TCG absolutes against
+  KVM figures, which is what A3 removed.
+  (e) Secondary sources (blog summaries, course-hosted PDF copies,
+  search-engine summaries). Rejected: not the source, which is A3's
+  reason.
+  (f) Deferring the section to a second DOI version, (ii) now and
+  (i) later, to leave time to read the ACM papers first. Rejected:
+  the section goes into the first posted version.
+- **Rationale:** *Legibility.* A technical report with a DOI is read
+  by people who place it against what they know; the section answers
+  their first question where they look for it, and each answer names
+  a source they can open. *Defensibility.* Under A3 the claim that
+  published figures are not comparable is an assertion the reader
+  must trust; under this entry each external number appears only
+  with its ISA, hypervisor or emulator, edges, and hardware in the
+  same sentence, and a committed citation record shows where each
+  was read and when, the same discipline the regeneration appendix
+  applies to Whimbrel's own numbers. The reading itself is evidence
+  for the rule: the uncited sentence had drifted ("x86") from the
+  sources it summarizes. Threats item 1 ("TCG is not hardware")
+  gains a source: Bellard's measurements of QEMU's translator found
+  different slowdowns for different kinds of code. *Scope.* No
+  campaign, no new Whimbrel number, nine references and four
+  paragraphs; the section makes no claim about Whimbrel's numbers
+  that Results does not already make.
+- **Consequences (edits this entry commits to; the T4.11 revision
+  performs those outside this log):**
+  - The section: `## Related work` sits between Background and
+    "Architecture of the apparatus". D-0064's section order gains it
+    and the References section and is otherwise unchanged.
+  - The Background and Cross-system A3 sentences gain "x86_64 or
+    aarch64 hosts", "between other edges", and a pointer to Related
+    work.
+  - The generator prose change: the matching sentence in
+    `write_cross_system` (`scripts/report-exhibits.py`) widens the
+    same way, and `report/exhibits/cross-system.md` is regenerated
+    (prose only; no cell moves) with `just report-exhibits-selftest`
+    still passing.
+  - The References block: `## References` sits between Future work
+    and Appendices, as a plain numbered list (no `[n]:` lines, which
+    Markdown would read as link definitions and hide). The PDF build
+    (`scripts/report-pdf.py`) ends the Appendices section at the next
+    `##` heading and prints anything after it behind the inlined
+    exhibits, so References must precede Appendices to print in the
+    body.
+  - The citation record: a new `report/references-read.md` (per
+    reference: the URL read, the passage relied on, the conditions as
+    the source states them, the time read), listed under Appendices
+    so the PDF inlines it.
+  - The rule that stays from A3, now stated for cited figures: an
+    external number appears only with the conditions under which it
+    was measured (ISA, hypervisor or emulator, what edge to what
+    edge, hardware) in the same sentence; every reference is read at
+    its source, with the passage and the date recorded; no number is
+    quoted from memory; a reference whose conditions could not be
+    read carries no number.
+  - The README's uncited ratio gloss (`README.md:31`, an A3
+    leftover; `docs/AUDIT-2026-10.md` findings 35 and 43) is replaced
+    by a pointer to Related work.
+  - D-0083 gains a dated amendment pointer at A3 (appended
+    2026-10-13).
+
+  Revisit: the reference list is closed at sign-off like the
+  exhibits; a later reader who adds a reference adds its row to the
+  citation record.
+
+## D-0085: Publish the report as a technical report with a Zenodo DOI from a tagged commit
+- Date: 2026-10-13    Status: accepted 2026-10-13
+- **Context:** D-0064 made the report the M4 artifact and fixed its
+  structure; D-0083 closed its open decisions and ruled out further
+  campaigns before sign-off. The form in which the report becomes
+  citable is still open. The draft is Markdown in `report/` that
+  links its generated exhibits and its regeneration appendix rather
+  than repeating them, so a reader outside the repository has no
+  single document to read or cite.
+- **Decision:** publish the report as one self-contained PDF, built by
+  `scripts/report-pdf.py` from a tagged commit on `main` and deposited
+  on Zenodo as a Report with a DOI, with the repository tree at the
+  tag as a related identifier. The sequence:
+  1. the bench-host session (the image-bytes record of D-0083 A2 and
+     the acceptance regeneration) and its commits;
+  2. the merge of `m4-evaluation` into `main`;
+  3. a DOI reserved on a Zenodo draft record and written
+     into `report/metadata.toml` with the title-page fields, in one
+     commit, so the title page prints the DOI;
+  4. an annotated tag on that commit (`v1.0.0-tr`),
+     since a lightweight tag is a movable ref (`docs/AUDIT-2026-10.md`
+     finding 38);
+  5. the build, `python scripts/report-pdf.py --release`, on a clean
+     checkout of the tag;
+  6. the upload of that PDF to the record, and publication;
+  7. one commit on `main` that gives the README its published status
+     and DOI and adds `CITATION.cff`.
+
+  "Self-contained" commits the PDF to four things. Every file the
+  draft's Appendices section lists is inlined, in that order, as an
+  appendix headed by its file name and opening with its own caption.
+  Every in-text link to an inlined file resolves inside the PDF.
+  Every other repository file prints as its path, and the title page
+  names the tree at the tag those paths refer to. The build fails on
+  a link that does not resolve or an exhibit the Appendices section
+  does not list, and `--release` also fails unless HEAD carries the
+  tag and `report/` and the build script match it.
+- **Alternatives considered:** a venue submission first (rejected: a
+  venue's page limit would cut the generated exhibits and the
+  regeneration appendix the claims rest on (D-0064), and its review
+  calendar would decide when a citable record exists, where D-0083
+  set the finish line at D-0064's gate). A six-page cut posted before
+  the full report (rejected: the first citable record would lack the
+  exhibits that regenerate its numbers, and two texts would then have
+  to agree, the drift D-0083 A6 retired the threats seed to avoid).
+  Committing the built PDF to the tree as the published form
+  (rejected: a binary in the tree has no DOI and can be replaced
+  without a new version; the tag and the script rebuild its content).
+- **Rationale:** a DOI on a build from a tag gives the report a
+  versioned, citable record on the owner's schedule, and the tag ties
+  every number in the PDF to the pins the regeneration appendix
+  names. Inlining the exhibits makes the PDF readable without the
+  repository; printing repository paths against the tagged tree keeps
+  every other reference checkable.
+- **Consequences:** `scripts/report-pdf.py`,
+  `scripts/requirements-report.txt` (Python-Markdown 3.10.2,
+  hash-pinned), and `report/metadata.toml` enter the tree (`bc931e6`).
+  The build needs Python 3.11 or later and a Chromium-family browser
+  (Edge or Chrome on Windows, chromium or google-chrome on Linux).
+  The PDF is never committed; it is built into `local/build/`. A
+  correction after publication is a new tag and a new Zenodo version
+  under the same concept DOI, never a replaced file. Before the tag,
+  the draft loses the two stray rules the build reports (the `---`
+  written directly under the TCP subsection's last paragraph, which
+  GitHub renders as a heading, and the `---` ending the Unikraft
+  section's last line, which prints as dashes), and the exhibit
+  generator writes a blank line between a table and the caption line
+  under it, so the build's normalization has nothing left to do.
+  Decided by the owner on 2026-10-13, and binding on the sequence
+  above:
+  - If the bench-host sitting cannot happen by 2026-10-28, the report
+    is posted by 2026-10-30 as Zenodo version 1 with the image-bytes
+    column marked pending, as the exhibits already disclose, and
+    version 2 follows the sitting.
+  - The PDF text is licensed CC BY 4.0, and the code stays MIT OR
+    Apache-2.0; the `license` field of `report/metadata.toml` prints
+    that line on the title page.
+  - The tag in step 4 is `v1.0.0-tr`, annotated.
+  - Step 3 is taken: the DOI is reserved on a Zenodo draft before
+    tagging and written into `report/metadata.toml` in one commit,
+    and the tag is then made on that commit, so the title page prints
+    its own DOI.
+  - `.zenodo.json` stays out of the repository root, and the upload
+    is by hand.

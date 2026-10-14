@@ -95,7 +95,7 @@ retired after three consecutive misses in the same direction.
 | `linker.ld` | image layout, including the dedicated user sections `check-utext` enforces |
 | `scripts/` | the harness: boot gates, pcap assertions, `bench.py`, the exhibit generator |
 | `bench/linux/` | pinned inputs for the Linux baseline: Buildroot pin, kernel-config fragments, `/init` |
-| `docs/` | `PLAN.md` (milestones, acceptance tests), `DECISIONS.md` (the 80-entry decision log), `DEBUGGING.md` (rv64/QEMU field guide), `GLOSSARY.md`, `SETUP.md` |
+| `docs/` | `PLAN.md` (milestones, acceptance tests), `DECISIONS.md` (the 85-entry decision log), `DEBUGGING.md` (rv64/QEMU field guide), `GLOSSARY.md`, `SETUP.md` |
 | `report/` | generated exhibits (`report/exhibits/`); the technical report itself is still in draft |
 | `results/` | latest-run CSVs, overwritten per run; report data lives only in pinned git objects (see [results/README.md](results/README.md)) |
 | `justfile` | every gate and campaign as a recipe |
