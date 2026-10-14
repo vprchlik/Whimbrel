@@ -5,7 +5,7 @@
 title = ""
 
 author = "Victor Prchlik"
-affiliation = ""
+affiliation = "Independent researcher; B.S. Computer Science, University of California, Santa Barbara, 2026"
 # Bare identifier (0000-0000-0000-0000); printed as https://orcid.org/<id>.
 orcid = ""
 
@@ -18,4 +18,4 @@ repository = "https://github.com/vprchlik/Whimbrel"
 # Empty until Zenodo assigns one (bare 10.xxxx/... form).
 doi = ""
 # The PDF text's license line, once decided. Empty: no line.
-license = ""
+license = "Text: CC BY 4.0. The repository's code: MIT OR Apache-2.0."
