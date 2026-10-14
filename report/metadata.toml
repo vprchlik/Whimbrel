@@ -1,0 +1,21 @@
+# Title-page metadata for scripts/report-pdf.py. An empty string is
+# left off the title page; nothing here is a measured number.
+
+# Empty: the draft's H1.
+title = ""
+
+author = "Victor Prchlik"
+affiliation = ""
+# Bare identifier (0000-0000-0000-0000); printed as https://orcid.org/<id>.
+orcid = ""
+
+# Empty: the git tag at HEAD if HEAD is tagged, else "<short hash> (unreleased)".
+version = ""
+# Empty: the build date, YYYY-MM-DD (`--date` overrides both).
+date = ""
+
+repository = "https://github.com/vprchlik/Whimbrel"
+# Empty until Zenodo assigns one (bare 10.xxxx/... form).
+doi = ""
+# The PDF text's license line, once decided. Empty: no line.
+license = ""
