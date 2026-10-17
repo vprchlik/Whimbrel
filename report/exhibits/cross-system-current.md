@@ -23,4 +23,6 @@ Ratios are E0→E4 medians under TCG; the emulation penalty applies to both arms
 - `release-fast-boot` / `trimmed` = **5.1×**
 - `release-fast-boot` / `stock` = **17.8×**
 
+The published Linux row is `trimmed`: a minimal Linux tuned in good faith, config published (D-0064, D-0062): `bench/linux/linux-trimmed.fragment` merged onto `qemu_riscv64_virt_defconfig` (Buildroot and kernel pinned by `bench/linux/PIN`), with `stock` beside it so the tuning claim can be checked.
+
 Detail — the before/after against the previous campaign, the E0→first-connect control, trim and observer cost, and the serial-regime note — lives in the frozen campaign exhibit: [cross-system-t48c.md](cross-system-t48c.md).

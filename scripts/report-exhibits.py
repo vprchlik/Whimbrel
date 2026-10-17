@@ -2037,8 +2037,9 @@ def write_cross_system(
             "Ratios below are E0→E4 medians on **RISC-V under QEMU TCG "
             "software emulation**, same host, same QEMU, both arms. "
             "Published unikernel and microVM boot figures come from "
-            "x86 under KVM hardware virtualization, and the medians in "
-            "this table compare with none of them; the ratio is the "
+            "x86_64 or aarch64 hosts under KVM hardware virtualization, "
+            "and the medians in this table compare with none of them; "
+            "the ratio is the "
             "comparable quantity, because the emulation penalty "
             "applies to both arms.",
             "",
@@ -2662,6 +2663,13 @@ def write_cross_system_current(
             f"**{fmt_ratio(e4['trimmed'], e4[FAST])}**",
             f"- `release-fast-boot` / `stock` = "
             f"**{fmt_ratio(e4['stock'], e4[FAST])}**",
+            "",
+            "The published Linux row is `trimmed`: a minimal Linux "
+            "tuned in good faith, config published (D-0064, D-0062): "
+            "`bench/linux/linux-trimmed.fragment` merged onto "
+            "`qemu_riscv64_virt_defconfig` (Buildroot and kernel "
+            "pinned by `bench/linux/PIN`), with `stock` beside it so "
+            "the tuning claim can be checked.",
             "",
             "Detail — the before/after against the previous "
             "campaign, the E0→first-connect control, trim and "

@@ -16,7 +16,7 @@ E0→E4 is the comparison: two direct client-clock stamps. No E3w-derived column
 Image bytes (D-0083 A2): no column for this pin. Its `Image-trimmed` (sha256 `fe821d1d5fcc…`) was overwritten by the D-0073 rebuild and is not reproducible (the kernel's version string is dated); the column starts at T4.8b, whose Linux artifacts are the ones on the bench host.
 
 
-Ratios below are E0→E4 medians on **RISC-V under QEMU TCG software emulation**, same host, same QEMU, both arms. Published unikernel and microVM boot figures come from x86 under KVM hardware virtualization, and the medians in this table compare with none of them; the ratio is the comparable quantity, because the emulation penalty applies to both arms.
+Ratios below are E0→E4 medians on **RISC-V under QEMU TCG software emulation**, same host, same QEMU, both arms. Published unikernel and microVM boot figures come from x86_64 or aarch64 hosts under KVM hardware virtualization, and the medians in this table compare with none of them; the ratio is the comparable quantity, because the emulation penalty applies to both arms.
 
 - `release-fast-boot` / `trimmed` = **14.5×**
 - `release-fast-boot` / `stock` = **18.1×**

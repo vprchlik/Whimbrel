@@ -493,9 +493,9 @@ Stops:
   exhibits or `scripts/report-exhibits.py`, item 7 pushes item 1's
   commit only. Two diffs have a known cause that is not item 4: a
   one-line diff in `regime-witness.md` adding its selftest sentence
-  means "Before you go" step 5 was skipped (the generator gained that
-  sentence at `f49a5d2`; the exhibit was last regenerated at
-  `79ff2bb`); a diff in `d0070-pcap.md` may come from its extractor
+  would mean the checkout predates `1ed0918`, which item 0's hash
+  check rules out, so any `regime-witness.md` diff here is a real
+  stop; a diff in `d0070-pcap.md` may come from its extractor
   changing after the exhibit was generated (exhibit `25e497f`;
   `scripts/d0070-pcap-pass.py` or `scripts/pcap_http.py` changed at
   `7307793`, `1c39556`, `06687e2`, and `7fe27fb`). Either is still a
@@ -921,10 +921,9 @@ Already done above:
 
 One difference: the audit's §8 item 7 expects exactly one modified
 file, `regime-witness.md` by finding 2's one-line diff, "to be
-committed from there". This runbook expects none, because finding 2
-is dispositioned "fix in the revision" and "Before you go" step 5
-commits the regenerated file first. If that step was skipped, item 5
-shows the audit's diff and stops as written there.
+committed from there". That file was regenerated from its generator
+and committed on Windows at `1ed0918` (2026-10-13), so this runbook
+expects no modified file, and item 5 stops on any diff.
 
 ### 8a. Selftest sentinels (finding 6) (2 min)
 
@@ -956,7 +955,8 @@ sha256sum target/riscv64gc-unknown-none-elf/release/mshim.bin
 these three; item 6's toolchain adds `riscv64-linux-gnu-objcopy`, so
 record which are present. Want: `mshim-blob:
 target/riscv64gc-unknown-none-elf/release/mshim.bin (320 bytes)` (320
-is D-0079's figure, `docs/DECISIONS.md:5610`; nothing committed
+is D-0079's figure, the sentence in its execution amendment that
+begins "`objcopy -O binary --only-section=.mshim` extracts"; nothing committed
 measures it, finding 10) and the sha256
 `1698b114daec15f0b6b2d6bc8d71a219897840939b75284d42aa6248ae6985fa`
 (the `bios_sha256` on every `m-release-*` row of `git show
@@ -1101,12 +1101,11 @@ Preflight passes only if these are committed and pushed first:
    `just report-exhibits` and `python3 scripts/regime-witness.py`,
    then `git status --porcelain` must print nothing. Item 4 stops if
    any exhibit other than its three changes on the host, and item 5
-   stops on any diff. At `12404d1` this fails for
-   `report/exhibits/regime-witness.md`: the generator gained its
-   selftest sentence at `f49a5d2` and the exhibit was last
-   regenerated at `79ff2bb`, so it diffs by that one line. Commit the
-   regenerated file. (`d0070-pcap.md` cannot be checked here; its
-   pcaps are on the bench host, and 5b is its check.)
+   stops on any diff. `report/exhibits/regime-witness.md` was
+   regenerated from its generator and committed at `1ed0918`
+   (2026-10-13), so it no longer diffs; expect no diff from either
+   generator. (`d0070-pcap.md` cannot be checked here; its pcaps are
+   on the bench host, and 5b is its check.)
 6. `git push origin m4-evaluation`, then `git ls-remote --tags origin`
    must list `baseline-t4.3`, `t44`, `t48b`, and `t48c` (item 0 checks
    them on the host).

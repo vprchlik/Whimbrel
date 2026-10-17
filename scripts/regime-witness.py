@@ -735,6 +735,13 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # A cp1252 console (Windows) cannot encode the arrows in the
+    # TEST PASS line; file I/O is pinned to UTF-8 already, so pin
+    # stdout and stderr the same way (as report-exhibits.py does).
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
     if sys.argv[1:] == ["selftest"]:
         try:
             sys.exit(cmd_selftest())
