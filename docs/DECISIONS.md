@@ -7658,3 +7658,62 @@ D-0011 onward are working decisions made under those constraints.
     its own DOI.
   - `.zenodo.json` stays out of the repository root, and the upload
     is by hand.
+- **Amendment (2026-10-16, D-0086):** the case the list above names
+  holds: the sitting is not before 2026-10-28, so version 1 is posted
+  after the owner's sign-off read of the text, with gate 1 stated as
+  outstanding, before step 1 runs; version 2 follows the sitting.
+  D-0086 carries that decision and the ORCID decision (none at
+  version 1).
+
+## D-0086: Post version 1 before the bench-host sitting, with gate 1 stated outstanding; version 2 after it
+- Date: 2026-10-16    Status: accepted 2026-10-16
+- **Context:** D-0085 sequenced the posting behind the bench-host
+  session and bound, in its Consequences, one case the owner decided
+  on 2026-10-13: if the sitting cannot happen by 2026-10-28, version 1
+  is posted by 2026-10-30 with the image-bytes column pending, and
+  version 2 follows the sitting. PLAN T4.12's gate walk left gate 7
+  as "sign-off follows the bench-host session" and gate 1 waiting on
+  the clean-checkout regeneration
+  (`docs/RUNBOOK-bench-host-2026-10-13.md` items 1, 4, and 5). On
+  2026-10-16 the owner set the sitting at not before 2026-10-28, so
+  that case holds. The ORCID field of `report/metadata.toml`,
+  `CITATION.cff`, and the Zenodo record was still open.
+- **Decision:** version 1 goes out after the owner's sign-off read of
+  the text, with gate 1 (byte-identical regeneration of every exhibit
+  from the pins on a clean checkout, and the image-bytes record)
+  stated as outstanding on the record: in this entry, in the README's
+  status paragraph at the DOI commit, in the Zenodo record's
+  description, and in one sentence of the report's "Pins and
+  regeneration" subsection. Version 2 follows the sitting; its date is
+  open. The Unikraft defect report (the review comment drafted under
+  T4.12 for unikraft/unikraft PR #1698) waits for that sitting,
+  because the reproduction at the D-0063 pin needs Linux. No ORCID at
+  version 1: the field is left out of the Zenodo record and of
+  `CITATION.cff`, and stays empty in `report/metadata.toml`.
+- **Alternatives considered:** waiting for the sitting (rejected: the
+  citable link is wanted by 2026-10-30, the sitting is not before
+  2026-10-28, and a stop in the runbook would push the posting past
+  the date with nothing posted). Posting without stating gate 1
+  (rejected: the exhibits disclose the pending column, and the gate
+  walk is part of the record the report claims). Creating an ORCID
+  for version 1 (deferred by the owner: a later ORCID is a metadata
+  edit on the record and a field in version 2, and changes no DOI).
+- **Rationale:** D-0085 already made a correction a new tag and a new
+  Zenodo version under one concept DOI, so version 1 retracts nothing
+  when version 2 lands; what version 1 lacks is disclosed where a
+  reader would look for it.
+- **Consequences:** D-0085's sequence runs with its step 1 moved after
+  step 7: the merge of `m4-evaluation` into `main`, the reserved DOI
+  written into `report/metadata.toml`, the annotated tag `v1.0.0-tr`,
+  the `--release` build on a clean checkout of the tag, the upload,
+  and the README and `CITATION.cff` commit; then `m4-evaluation` is
+  brought level with `main`, so the runbook's hand-written preflight
+  hash is the posted tree; then the sitting, its commits, and version
+  2 from a new annotated tag, named when it is made. Before the tag,
+  the pre-publication polish (audit findings 59 and 61, the
+  generators' prose, the two remaining "386 µs", and the blank line
+  D-0085's Consequences ask of the generator) lands as its own commit.
+  D-0085 gains a dated amendment pointer; PLAN T4.12's gate 1 and
+  gate 7 lines gain one each. Revisit: version 2 removes the
+  outstanding-gate sentences and the pending column once the
+  sitting's commits are in.

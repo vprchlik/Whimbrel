@@ -1824,7 +1824,9 @@ and the DECISIONS catch-up above are done. One line per gate:
    the clean-checkout run of all three generators and the image-bytes
    record are `docs/RUNBOOK-bench-host-2026-10-13.md` items 1, 4, and
    5, and the stability verdicts per campaign are in the draft's
-   Protocol subsection.
+   Protocol subsection. Amended 2026-10-16 (D-0086): stated as
+   outstanding at version 1 of the posted report; version 2 follows
+   the sitting.
 2. Done: `report/exhibits/ladder.md`, every rung landed-with-row or
    declined-with-reason, `virtq_init` declined by D-0083 A1 (finding
    41).
@@ -1843,7 +1845,10 @@ and the DECISIONS catch-up above are done. One line per gate:
    dispositions signed off 2026-10-13, its should-fix items in the
    revision; GLOSSARY and DECISIONS are current with this task.
 7. Open: sign-off follows the bench-host session; D-0085 sets the
-   posting sequence and its 2026-10-28 fallback.
+   posting sequence and its 2026-10-28 fallback. Amended 2026-10-16
+   (D-0086): the sitting is not before 2026-10-28, so the fallback
+   holds; version 1 is posted after the owner's sign-off read of the
+   text, with gate 1 stated as outstanding.
 
 ## Milestone acceptance test
 
