@@ -18,10 +18,10 @@ Source: `git show t48c:results/{runs,phases}.csv` (batches `20260821T233038Z-1` 
 Image bytes (D-0083 A2): column pending. The record `results/image-bytes.csv` is not yet pinned (`IMAGE_BYTES_REV` is unset in `scripts/report-exhibits.py`); once the bench-host measurement is committed and pinned, this table gains the column and this line goes away.
 
 
-Ratios are E0→E4 medians under TCG; the emulation penalty applies to both arms (KVM-comparability caveat in the T4.8 exhibit, unchanged):
+These ratios compare Linux and Whimbrel E0→E4 medians on the same host under QEMU TCG. Shared emulation does not establish equal overhead for the two systems or make the ratios transferable to KVM or other hosts:
 
-- `release-fast-boot` / `trimmed` = **5.1×**
-- `release-fast-boot` / `stock` = **17.8×**
+- `trimmed` / `release-fast-boot` = **5.1×**
+- `stock` / `release-fast-boot` = **17.8×**
 
 The published Linux row is `trimmed`: a minimal Linux tuned in good faith, config published (D-0064, D-0062): `bench/linux/linux-trimmed.fragment` merged onto `qemu_riscv64_virt_defconfig` (Buildroot and kernel pinned by `bench/linux/PIN`), with `stock` beside it so the tuning claim can be checked.
 

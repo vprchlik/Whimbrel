@@ -1,5 +1,37 @@
 # results/ — T4.1 harness output (D-0055)
 
+## Reading this record
+
+This file collects schema descriptions and bench-host specifications from
+successive decisions. Earlier proposals remain beside later amendments.
+Read each section in its decision and campaign context; an old “approved”
+procedure or “not yet” statement alone does not establish the current state.
+
+Three distinctions help avoid confusion:
+
+- The D-0067 `--baseline-tag` / `--after-batches` command is a proposed
+  interface. The current [exhibit generator](../scripts/report-exhibits.py)
+  accepts no arguments for generation, or `selftest` for its checks;
+  it reads its named pins rather than those proposed flags.
+- The earlier “T4.8b: not a pin yet” statement predates the recorded
+  campaign. The [current comparison](../report/exhibits/cross-system-current.md)
+  identifies the comparison pin and links the preserved campaign exhibits.
+- Earlier sections describe `synack_to_http_ns` as memory-only. The
+  D-0079 amendment below records its later addition to CSVs; the current
+  [harness](../scripts/bench.py) includes that field and the canary fields
+  in its run schema. Apply schema descriptions to the pin being read.
+
+Interleaving and shuffling reduce the risk of confounding configuration
+with run order; they do not guarantee that host drift cannot affect a
+comparison. The [exhibit reading notes](../docs/EXHIBIT-READING-NOTES.md)
+also explain limits on controls and causal interpretations, including
+the sign of the FIN-after-receipt tail in the startup remainder.
+
+The decision-specific record below is preserved. Its historical commands,
+measurement gates and numeric claims have not been rewritten.
+
+## Original schema and decision-specific specifications
+
 Long/tidy CSV, not wide. T4.2 adding stamps is **more rows in
 `phases.csv`**, not more columns and not a schema migration.
 

@@ -17,25 +17,24 @@ the same config. `just linux-build` runs it on the bench host only, and
 `bench/linux/MANIFEST` records the hashes it produced. The root
 filesystem is not Buildroot's (see initramfs).
 
-**campaign, batch, trial.** A trial is one boot: a fresh QEMU process
-with its own packet capture and serial log, one client request, one row
-in `results/runs.csv`, and one row per phase in `results/phases.csv`. A
-batch is one pass in which every arm runs its warmup trials round-robin
-and then its recorded trials, interleaved and shuffled with a recorded
-seed; its rows share a `batch_id`. A campaign is one invocation of a
-`just bench-*` recipe: two batches, one canary boot, and host controls
-checked at start (D-0055, D-0078, D-0079). The stability criterion and
-the same-campaign rules compare only within a campaign.
+**campaign, batch, trial.** A trial is one boot of a fresh QEMU process, with its own
+packet capture and serial log, one client request, one row in `results/runs.csv`,
+and one row per phase in `results/phases.csv`. A batch first runs each arm's
+warmup trials round-robin, then interleaves and shuffles the recorded trials
+with a recorded seed. Its rows share a `batch_id`. A campaign is one invocation
+of a `just bench-*` recipe, comprising two batches, one canary boot, and host
+controls checked at the start (D-0055, D-0078, D-0079). The stability criterion
+and the same-campaign rules compare results only within a campaign.
 
-**canary boot.** A boot of `release-default` that runs before trial 1 of
-every campaign and is not itself a trial: its `stvec` and
-`page_verify` deltas are recorded in the batch header as
-`canary_stvec_ns` and `canary_page_verify_ns`, so the day's serial
-regime is visible in the artifacts (D-0078). A canary that prints no `PHASE` dump refuses the
-campaign. The D-0078 amendment demoted it from certificate to component
-after it disagreed with the recorded witness: a campaign's regime is the
-canary joined with the safe arm's per-trial `page_verify` within one
-kernel family (`report/exhibits/regime-witness.md`).
+**canary boot.** A `release-default` boot before trial 1 of every campaign. It is
+not a trial. Its `stvec` and `page_verify` deltas appear in the batch header as
+`canary_stvec_ns` and `canary_page_verify_ns`, recording evidence of the day's
+serial regime (D-0078). A canary that produces no `PHASE` dump prevents the
+campaign from proceeding. After the canary disagreed with the recorded witness,
+the D-0078 amendment made it one component of the regime check rather than a
+certificate on its own. The check combines the canary with the safe arm's
+per-trial `page_verify` within one kernel family
+(`report/exhibits/regime-witness.md`).
 
 **CLINT (Core-Local Interruptor).** The per-hart block on QEMU `virt` (at
 0x0200_0000) holding the `mtime` counter, the `mtimecmp` timer comparators, and
@@ -206,11 +205,17 @@ state from status-register fields (`MPP`/`SPP`, `MPIE`/`SPIE`) and jump to the
 saved PC (`mepc`/`sepc`). They are also the *only* way privilege goes down —
 OpenSBI `mret`s into our kernel, and our kernel will `sret` into U-mode.
 
-**M-mode shim.** The 320-byte firmware replacement of the `-bios none`
-lane (D-0061/D-0079): a straight-line M-mode program in QEMU's `-bios`
+**M-mode shim.** The firmware replacement of the `-bios none` lane
+(D-0061/D-0079), recorded as 320 bytes in D-0079: a straight-line
+M-mode program in QEMU's `-bios`
 slot that sets the PMP catch-all, transcribes OpenSBI's delegation
 masks, enables counters and Sstc, installs both trap diagnostics, and
-`mret`s into the unmodified kernel. No resident services — after
+`mret`s into the S-mode kernel. The campaign uses a kernel variant
+built with `bios-none` for the timer, console and other firmware seams;
+it is not byte-identical to the OpenSBI-lane kernel. The October audit
+requested artifact-level verification of the recorded blob size
+([finding 10](AUDIT-2026-10.md)); the extraction script bounds size but
+does not assert an exact byte count. No resident services — after
 `mret`, any M-mode trap is a bug and prints itself. Checkpoint letters
 `ZPDCTVM` bisect a silent boot to one block.
 
@@ -247,16 +252,16 @@ T3.12(a) measured the E2 offset as 0, so `_start` *is* the OpenSBI phase.
 Headline E2→E3g uses a client retrying before E0; `just test`'s
 curl-after-`HTTP READY` E3g is harness wait (D-0043).
 
-**median, IQR, minimum.** The three statistics every reported metric
-carries (D-0055; PLAN M4 concept 1). The median of the recorded trials
-is the comparison and before/after statistic, and the IQR, the 25th to
-75th percentile computed inclusive (type 7), is its spread. Noise on
-this platform is one-sided and additive, so the minimum approaches the
-floor and is shown as the observed floor bound; it also improves with N
-and is unfair across systems with different noise, so no comparison
-rests on it. Means are never used, because one descheduled trial moves
-a mean invisibly, and a phase's share is its median over the E2→E3g
-median, not a median of ratios.
+**median, IQR, minimum.** Every reported metric carries these three statistics
+(D-0055; PLAN M4 concept 1). Comparisons, including before/after comparisons,
+use the median of the recorded trials. The IQR describes their spread from
+the 25th to the 75th percentile, computed inclusive (type 7). Noise on this
+platform is one-sided and additive, so the minimum approaches the floor and
+is reported as an observed floor bound. It also improves with N and cannot
+support a fair comparison across systems with different noise. Means are
+never used because one descheduled trial can shift a mean without revealing
+that trial's influence. A phase's share is its median divided by the E2→E3g
+median, not a median of per-trial ratios.
 
 **MMIO (Memory-Mapped I/O).** Device registers exposed at physical addresses,
 accessed with ordinary load/store instructions instead of special I/O
@@ -268,30 +273,28 @@ library, leaving only `core` (language essentials, no OS assumptions) and
 optionally `alloc` (heap types, once we provide an allocator). It's the
 language-level statement that *we* are the operating system.
 
-**observer cost.** The E0→E4 cost of the Linux instrumented cmdline:
-the `trimmed-instrumented` median minus the `trimmed` median within one
-campaign, on the same `Image-trimmed`. It contains in-window console
-output, whose per-byte cost is a per-boot host variable, so the cell is
-day-scoped and compares across campaigns only when their serial regimes
-agree (D-0078; `report/exhibits/cross-system-t48c.md`). Whimbrel's
-observer effects are the stamp overhead, measured on every boot by
-`stamp_a` and `stamp_b`, and the post-response `PHASE` dump (Threats
-item 10).
+**observer cost.** The E0→E4 difference between the Linux `trimmed-instrumented`
+and `trimmed` medians within one campaign, using the same `Image-trimmed`.
+It includes console output inside the measurement window. Because the cost
+per byte varies with per-boot host state, this cell is day-scoped: comparisons
+across campaigns require matching serial regimes (D-0078;
+`report/exhibits/cross-system-t48c.md`). Whimbrel's observer effects are the
+timestamp overhead measured on every boot by `stamp_a` and `stamp_b`, and
+the post-response `PHASE` dump (Threats item 10).
 
 **OpenSBI.** The reference open-source implementation of the SBI spec — the
 M-mode firmware QEMU bundles as `-bios default`. It initializes the machine,
 protects itself with PMP, delegates traps to S-mode, jumps to our kernel, and
 then stays resident to service our `ecall`s.
 
-**pin.** A recorded, immutable identifier for an input a number depends
-on. A data pin is a git object, an annotated tag such as
-`baseline-t4.3` or a full commit hash, from which a generator reads
-`results/*.csv` with `git show`; the working tree and `HEAD` are never
-pins, because the harness overwrites the CSVs on every run (D-0067; the
-Pins section of `report/appendix-regenerate.md`). Input pins are the
-QEMU version, the Buildroot release and tarball sha256
-(`bench/linux/PIN`), the artifact hashes in `bench/linux/MANIFEST`, and
-the Unikraft commit (D-0063).
+**pin.** An immutable recorded identifier for an input on which a reported number
+depends. A data pin identifies a git object through an annotated tag such as
+`baseline-t4.3` or a full commit hash; generators read its `results/*.csv`
+with `git show`. The working tree and `HEAD` are never pins, because the
+harness overwrites the CSVs on every run (D-0067; the Pins section of
+`report/appendix-regenerate.md`). Input pins also include the QEMU version,
+the Buildroot release and tarball sha256 (`bench/linux/PIN`), the artifact
+hashes in `bench/linux/MANIFEST`, and the Unikraft commit (D-0063).
 
 **PLIC (Platform-Level Interrupt Controller).** The chip (at 0x0C00_0000 on
 `virt`) that gathers external device interrupts (UART, virtio), prioritizes
@@ -311,20 +314,21 @@ address shifted right 12 — writing the address itself is a factor-of-4096
 error (PLAN M1 concept 11).
 
 **PTE (page-table entry).** A 64-bit Sv39 word: V/R/W/X/U/G/A/D in the low
-bits, PPN in [53:10]. Any of R/W/X set makes it a leaf (including a 2 MiB
-or 1 GiB superpage); a non-leaf must have V=1 and R=W=X=0 or the walk
-stops early (concept 11.4). The RAM interior uses 2 MiB L1 leaves
+bits, PPN in [53:10]. In a valid PTE, R or X marks a leaf (including a 2 MiB
+or 1 GiB superpage). W without R is reserved and rejected by the walker.
+A non-leaf must have V=1 and R=W=X=0 (concept 11.4). The RAM interior uses 2 MiB L1 leaves
 (D-0059); 4 KiB L0 everywhere the map distinguishes at 4 KiB grain.
 1 GiB L2 leaves are still rejected (D-0026).
 
 **RVC (compressed instructions).** The C extension gives 16-bit encodings for
-common integer operations; a trap can land on either a 2-byte or a 4-byte
-instruction. `ecall` / `ebreak` / CSR ops have no C encoding and are always
-4 bytes — OpenSBI can therefore advance `mepc` by 4 after an S-mode `ecall`.
-Our S-mode handler (M1/T1.2) must not copy that shortcut: inspect the
-instruction at `sepc` (low two bits `0b11` ⇒ 32-bit, otherwise 16-bit) and
-advance by that width, or a compressed trap will skip a byte and a later
-`sret` will land mid-instruction.
+common integer operations, so a trap can land on a 2-byte or a 4-byte
+instruction. `ecall` and CSR operations have no C encoding and are always
+4 bytes; `ebreak` has the compressed form `c.ebreak`. OpenSBI can therefore
+advance `mepc` by 4 after an S-mode `ecall`. Our S-mode handler (M1/T1.2)
+must inspect the instruction at `sepc`: low two bits `0b11` mean 32-bit,
+otherwise 16-bit. It advances by that width. Advancing past a compressed
+instruction by the wrong width can put a later `sret` in the middle of the
+following instruction.
 
 **RTO (retransmission timeout).** How long TCP waits for an ACK of its one
 unacked segment before posting a copy. Ours is 200 ms of `rdtime` from the
@@ -410,14 +414,14 @@ v1.3 on QEMU `virt` advertises it as `Boot HART ISA Extensions: time,sstc`.
 M1 arms through SBI TIME instead (D-0018); Sstc is the M4 comparison, not
 the M1 mechanism.
 
-**stability criterion.** D-0055's numeric test that the harness
-reproduces itself: within one campaign, the two batches' per-metric
-medians agree within max(2%, 200 µs) for every metric of 1 ms or more
-(D-0055), compared per config, batch 1 against batch 2, never arm
-against arm. It was T4.1's finish line, and a campaign that fails it
-publishes nothing (t47b aborted at it). It cannot see a host state that
-holds for a whole campaign (serial regime), and what it should do about
-E0-side drift is open (D-0080; D-0083 A5).
+**stability criterion.** D-0055's test of whether the harness reproduces itself.
+Within one campaign, the two batches' per-metric medians must agree within
+max(2%, 200 µs) for every metric of 1 ms or more (D-0055). The comparison
+is per config, batch 1 against batch 2, never arm against arm. This was
+T4.1's finish line; a campaign that fails it publishes nothing, as happened
+to t47b. The criterion cannot detect a host state that persists throughout
+a campaign, such as the serial regime. How it should handle E0-side drift
+remains open (D-0080; D-0083 A5).
 
 **superpage.** An Sv39 leaf at level 1 (2 MiB) or level 2 (1 GiB). The PPN
 must be aligned to that size or the walk faults. We map the aligned
@@ -436,14 +440,15 @@ translated through three levels of 512-entry page tables to 4 KiB pages, with
 512 GiB of address space — absurdly more than our 128 MiB of RAM, which is
 why we don't need Sv48.
 
-**TCG (Tiny Code Generator).** QEMU's software accelerator: a
-just-in-time translator that converts guest instructions into host
-instructions at run time and caches the result. It is QEMU's default
-when no hardware accelerator is named, and every number in this project
-is under TCG, with no KVM. TCG time is not hardware time: compute-dense
-and MMIO-dense work are taxed differently than on silicon, so phase
-shares would differ on hardware, and only the ratio between arms on one
-host transfers (PLAN M4 concept 2; Threats item 1; D-0083 A3; D-0084).
+**TCG (Tiny Code Generator).** QEMU's software accelerator. Its just-in-time
+translator converts guest instructions into host instructions at run time
+and caches the result. QEMU uses it by default when no hardware accelerator
+is named. Every measurement in this project uses TCG, with no KVM.
+Compute-dense and MMIO-dense work incur different emulation costs, so their
+phase shares would differ on hardware. The reported ratios compare arms
+on the measured host; these measurements do not establish that the ratios
+transfer to other hosts or hardware acceleration (PLAN M4 concept 2;
+Threats item 1; D-0083 A3; D-0084).
 
 **TIME (SBI).** The SBI extension we use to arm the supervisor timer
 (`sbi_set_timer`, absolute `rdtime` deadline). Re-arming is also how S-mode
@@ -472,9 +477,10 @@ does `mv sp, a0` to switch. `sscratch` holds that kstack top in U-mode and
 0 in S-mode (D-0029).
 
 **U bit.** PTE flag that marks a user page. User fetch/load/store of a `U=0`
-page faults; S-mode access of a `U=1` page faults unless `SUM` is set. It
-never stops the kernel reading its own pages, which is why user pointers
-are checked in software.
+page faults. S-mode loads and stores to a `U=1` page fault unless `SUM` is
+set; S-mode instruction fetches from user pages fault regardless of `SUM`.
+The kernel can still read its own pages, so user pointers must be checked
+in software.
 
 **unikernel.** A single application linked with exactly the OS services it
 needs into one bootable image — no processes, no dynamic loading, no

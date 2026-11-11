@@ -18,11 +18,15 @@ if apt-cache show qemu-system-riscv >/dev/null 2>&1; then
 else
     QEMU_PKG=qemu-system-misc
 fi
+# QEMU_PKG provides qemu-system-riscv64.
+# gdb-multiarch provides GDB with riscv64 support on Debian/Ubuntu.
+# build-essential provides linker/binutils/make for the build scripts and C tooling.
+# tshark checks the M3+ harness's filter-dump packet captures.
 sudo apt-get install -y \
-    "$QEMU_PKG" \             # provides qemu-system-riscv64 (the whole "hardware")
-    gdb-multiarch \           # GDB built with riscv64 support (Debian/Ubuntu naming)
-    build-essential \         # linker/binutils/make for build scripts and C-adjacent tooling
-    tshark \                  # pcap assertions in the M3+ net harness (filter-dump captures)
+    "$QEMU_PKG" \
+    gdb-multiarch \
+    build-essential \
+    tshark \
     curl git
 ```
 
@@ -184,11 +188,14 @@ list dies in Buildroot's `dependencies.sh` / kernel `scripts/kconfig`
 before it produces an Image. Install, then leave them installed:
 
 ```bash
+# bison and flex support kernel scripts/kconfig (YACC and LEX).
+# libssl-dev supplies kernel host headers for module signing and scripts.
+# bc is used by kernel Makefile timeconst and checked by recipe preflight.
 sudo apt-get install -y \
-    bison \          # kernel scripts/kconfig (YACC)
-    flex \           # kernel scripts/kconfig (LEX)
-    libssl-dev \     # kernel host headers (module signing / scripts)
-    bc               # kernel Makefile timeconst; recipe preflight
+    bison \
+    flex \
+    libssl-dev \
+    bc
 ```
 
 This host needed `bison`, `flex`, and `libssl-dev` on top of an already

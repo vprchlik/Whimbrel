@@ -2655,13 +2655,14 @@ def write_cross_system_current(
         [
             *image_bytes_lines(col, label, IMAGE_BYTES_REV or ""),
             "",
-            "Ratios are E0→E4 medians under TCG; the emulation "
-            "penalty applies to both arms (KVM-comparability caveat "
-            "in the T4.8 exhibit, unchanged):",
+            "These ratios compare Linux and Whimbrel E0→E4 medians "
+            "on the same host under QEMU TCG. Shared emulation does "
+            "not establish equal overhead for the two systems or "
+            "make the ratios transferable to KVM or other hosts:",
             "",
-            f"- `release-fast-boot` / `trimmed` = "
+            f"- `trimmed` / `release-fast-boot` = "
             f"**{fmt_ratio(e4['trimmed'], e4[FAST])}**",
-            f"- `release-fast-boot` / `stock` = "
+            f"- `stock` / `release-fast-boot` = "
             f"**{fmt_ratio(e4['stock'], e4[FAST])}**",
             "",
             "The published Linux row is `trimmed`: a minimal Linux "
