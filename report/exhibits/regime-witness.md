@@ -10,7 +10,7 @@ family; the regime divide is applied only inside a family
 that exhibits both clusters or a corroborating in-family boot
 record. Warmup `page_verify` is joined by batch and trial
 position; the closing finding is computed from that join.
-Regeneration: `python3 scripts/regime-witness.py`.
+Regeneration: `python3 scripts/regime-witness.py`. Failing-input selftest: `python3 scripts/regime-witness.py selftest`.
 
 ### kernel family `801cae40af49…`
 

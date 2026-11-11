@@ -1,5 +1,37 @@
 # results/ — T4.1 harness output (D-0055)
 
+## Reading this record
+
+This file collects schema descriptions and bench-host specifications from
+successive decisions. Earlier proposals remain beside later amendments.
+Read each section in its decision and campaign context; an old “approved”
+procedure or “not yet” statement alone does not establish the current state.
+
+Three distinctions help avoid confusion:
+
+- The D-0067 `--baseline-tag` / `--after-batches` command is a proposed
+  interface. The current [exhibit generator](../scripts/report-exhibits.py)
+  accepts no arguments for generation, or `selftest` for its checks;
+  it reads its named pins rather than those proposed flags.
+- The earlier “T4.8b: not a pin yet” statement predates the recorded
+  campaign. The [current comparison](../report/exhibits/cross-system-current.md)
+  identifies the comparison pin and links the preserved campaign exhibits.
+- Earlier sections describe `synack_to_http_ns` as memory-only. The
+  D-0079 amendment below records its later addition to CSVs; the current
+  [harness](../scripts/bench.py) includes that field and the canary fields
+  in its run schema. Apply schema descriptions to the pin being read.
+
+Interleaving and shuffling reduce the risk of confounding configuration
+with run order; they do not guarantee that host drift cannot affect a
+comparison. The [exhibit reading notes](../docs/EXHIBIT-READING-NOTES.md)
+also explain limits on controls and causal interpretations, including
+the sign of the FIN-after-receipt tail in the startup remainder.
+
+The decision-specific record below is preserved. Its historical commands,
+measurement gates and numeric claims have not been rewritten.
+
+## Original schema and decision-specific specifications
+
 Long/tidy CSV, not wide. T4.2 adding stamps is **more rows in
 `phases.csv`**, not more columns and not a schema migration.
 
@@ -285,6 +317,27 @@ Fail closed on the header:
 
 Do not copy S into `results/baseline-summary.txt` unless the freeze
 is retaken on a new machine. The freeze object stays frozen.
+
+### Image-bytes record (D-0083 A2)
+
+`results/image-bytes.csv` is written on the bench host by
+`python3 scripts/image-bytes.py measure` and committed; it is the only
+size record the report reads. One row per (pin, arm, role): `role`
+is `kernel` (the `-kernel` file) or `initrd` (the Linux `rootfs.cpio`,
+quoted beside the column and never summed into it). `loaded_bytes`
+is what QEMU copies into guest memory: the sum of `PT_LOAD` file
+sizes for Whimbrel's ELF, the file length for a flat `Image`;
+`file_bytes` is the file length. `pin_sha256` is the arm's
+`kernel_sha256` from the pin's `runs.csv` (or the MANIFEST hash for
+the cpio); `sha256` is the measured file. They are equal except for a
+Whimbrel kernel rebuilt at the pin's `git_sha` under a toolchain that
+no longer reproduces the pin, recorded only with
+`--allow-rebuild --note`, which the exhibit discloses. Linux Images
+must match the pin. `python3 scripts/image-bytes.py verify` re-checks
+a record against the pins anywhere git runs. The generator reads the
+record as a git object at `IMAGE_BYTES_REV`, never from the working
+tree. T4.8's `Image-trimmed` was overwritten by the D-0073 rebuild
+and is not reproducible; that exhibit carries no column.
 
 ### Stability and summary
 

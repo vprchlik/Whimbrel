@@ -1,8 +1,8 @@
-# DEBUGGING — rv64 / QEMU field guide
+# DEBUGGING: rv64 / QEMU field guide
 
-Bare-metal debugging has exactly three information channels: the serial
-console, the GDB stub, and QEMU's own logging/monitor. This file is the map.
-When a bug costs more than 30 minutes, add its symptom → cause here afterward.
+Start with three debugging channels: the serial console, the GDB stub, and
+QEMU's logging and monitor. This guide explains how to use them in this project.
+When a bug takes more than 30 minutes to resolve, add its symptom → cause here.
 
 ## 1. GDB over QEMU
 
@@ -22,7 +22,7 @@ CodeLLDB works for source-level stepping; drop to `gdb-multiarch` when you
 need CSRs or disassembly-level truth. GDB reads CSRs on QEMU; LLDB mostly
 doesn't.)
 
-Bread-and-butter commands:
+Common GDB commands:
 
 ```
 (gdb) break kmain            # symbol breakpoints work normally
@@ -45,15 +45,15 @@ Notes:
 - QEMU's stub implements software breakpoints internally — `break` works even
   in ROM-like conditions; reach for `hbreak` if a breakpoint mysteriously
   doesn't fire (e.g. across the M1 `satp` switch).
-- If `continue` "hangs", the guest is probably in a `wfi` or a trap loop —
-  hit Ctrl-C in gdb and look at `$pc` and `scause`. That *is* information.
+- If `continue` appears to hang, interrupt it with Ctrl-C in gdb and inspect
+  `$pc` and `scause`. The guest may be waiting in `wfi` or repeating a trap.
 - After enabling paging (identity map), symbols and addresses still match;
   if you ever see gdb showing nonsense source for a sane `$pc`, you're
   probably executing a stale binary — rebuild, `load`, or restart `just debug`.
 
 ## 2. QEMU trap/interrupt logging: `-d int`
 
-When there's no output and GDB feels too slow, make QEMU narrate every trap:
+If the guest produces no output, use QEMU's trap log to follow execution:
 
 ```
 qemu-system-riscv64 -machine virt -nographic -bios default \
@@ -85,8 +85,8 @@ Read: `async:0` = exception (1 = interrupt), `cause`/`desc` = what happened,
 
 ## 3. Reading `scause` / `sepc` / `stval` after a trap
 
-The hardware answers three questions on every trap. Learn to read them raw —
-from our panic printout, from gdb, or from `-d int`, it's the same three:
+These three CSRs describe each trap. Read them from the panic printout,
+gdb, or `-d int`:
 
 | CSR | Question it answers |
 |---|---|
@@ -160,8 +160,8 @@ never reached your code. In rough order of likelihood:
    are a MODE field — a non-4-byte-aligned handler address silently corrupts
    both mode and address). Advancing `sepc` is a separate footgun: `ecall` is
    always 4 bytes, but the trapped instruction in general may be 2 (RVC).
-   Hardcoding `sepc += 4` in our handler will skip a byte after a compressed
-   trap. Decode width from the instruction at `sepc` (see GLOSSARY: RVC).
+   Hardcoding `sepc += 4` after a compressed trap can resume in the middle
+   of the following instruction. Decode the width at `sepc` (see GLOSSARY: RVC).
    **Observed T1.2:** the self-test `ebreak` was emitted as `c.ebreak`
    (encoding `0x9002`, width 2) at `sepc=0x8020114a`. A hardcoded `+4` would
    have `sret`'d into the middle of the next instruction. D-0021's decode is
@@ -172,7 +172,7 @@ never reached your code. In rough order of likelihood:
    "impossibly" — or works in QEMU and would fail on hardware. Fence after
    every PTE change (project rule).
 6. Missing A/D bits in PTEs → cause 13/15 on first touch, on QEMU configs that
-   don't set them in hardware. We set A|D on all kernel leaves (PLAN M1/T1.5).
+   don't set them in hardware. We set A|D on all kernel leaves (D-0019).
 7. Timer interrupt enabled before `stvec` points at a real handler.
 8. **Post-T1.3, `park()` is not quiescence.** `park` is `wfi`. With `sie.STIE`
    set, the hart wakes every 10 ms, runs the timer handler, and `sret`s into
@@ -206,12 +206,11 @@ so both channels here are outside the guest:
    under the new tables. Read the *first* block, not the hundredth — the rest
    are the loop.
 2. **Monitor `info mem`.** This dumps the decoded Sv39 tables. Compare it
-   against the linker map and against the expected permissions in PLAN.md's
-   M1 memory-map table. Answering "did I map what I think I mapped" takes one
+   against the linker map and against the permissions the boot-time probes
+   expect for each region (`src/page.rs`). Answering "did I map what I think I mapped" takes one
    command and beats an hour of re-reading the mapping code.
-3. **Work prerequisite concept 11 as a checklist** (PLAN.md, M1). It
-   enumerates the twelve conditions that must hold before the `csrw` retires,
-   in roughly the order they break: `MODE`, the `PPN` shift, the root entry,
+3. **Work the twelve conditions as a checklist.** All of them must hold
+   before the `csrw` retires. In roughly the order they break: `MODE`, the `PPN` shift, the root entry,
    non-leaf `R=W=X=0`, leaf `X`, leaf `U=0`, `A`/`D`, identity, walker
    reachability, stack and `ra`, the `stvec` page, and the interrupt window.
 4. **Suspect the two silent ones first.** `satp.MODE=0` means paging never
@@ -285,8 +284,7 @@ L0 because those VAs remain in the 4 KiB region.
 6. **Kernel stack overflow — a hang with no output. Known unrecoverable.**
    See below.
 7. **Undelegated illegal instruction from U — firmware dump, hart parked,
-   no `task N killed` line.** Cause 2 is not in `MEDELEG` (PLAN M1 concept 9,
-   D-0034). A task that executes `unimp`, or an FP op with `FS=Off`, traps
+   no `task N killed` line.** Cause 2 is not in `MEDELEG` (D-0034). A task that executes `unimp`, or an FP op with `FS=Off`, traps
    to OpenSBI, not to us. Symptom: an OpenSBI "unhandled trap" dump
    (`mcause=2`, `mepc` in `.utext`) and a parked hart; QEMU may sit there
    until the hang-guard. There is no kernel `PANIC`, no `task N killed`,
@@ -485,7 +483,7 @@ current translation; disagreement between them is itself a diagnosis.
 
 ## 6. When stuck > 30 minutes — checklist
 
-Work the list in order; each step either finds it or shrinks the search space.
+Work through this list in order, using each observation to narrow the cause.
 
 1. **State the symptom in one sentence** with the three CSR values if any
    trap printed. If you can't, that's the first problem: get `scause`/`sepc`/
@@ -507,14 +505,14 @@ Work the list in order; each step either finds it or shrinks the search space.
 6. **Interrogate the paging state:** monitor `info mem`; is the current `$pc`
    mapped X? Is the stack mapped W? Is the trap handler mapped?
 7. **Write down three hypotheses ranked by likelihood and the observation
-   that would kill each.** Test the cheapest first. (This step exists because
-   steps 1–6 done angrily produce nothing.)
+   that would rule out each.** Test the cheapest first, using the evidence
+   collected in steps 1–6.
 8. **Reduce:** comment out until it boots, reintroduce until it breaks. With
    sub-second boots, bisection is cheap.
 9. **Explain it out loud from hardware up** — to the rubber duck or to the
    agent ("here's what the hardware should do at this instruction; here's
-   what I observe"). If a step in your explanation is fuzzy, that step is the
-   bug's home. Then take a real break.
+   what I observe"). Check any step you cannot explain before drawing a
+   conclusion about the cause. Then take a break.
 10. **Found it?** Add symptom → cause to §4, and if the fix embodies a choice,
     log it in DECISIONS.md.
 

@@ -851,6 +851,14 @@ report-exhibits:
 report-exhibits-selftest:
     python3 scripts/report-exhibits.py selftest
 
+# D-0083 A2: image-bytes record. `measure` runs on the bench host
+# (see results/README.md); `verify` and `selftest` run anywhere.
+image-bytes-selftest:
+    python3 scripts/image-bytes.py selftest
+
+image-bytes-verify:
+    python3 scripts/image-bytes.py verify
+
 # Failing-input selftest for the derived D-0078 finding. Does not write the exhibit.
 regime-witness-selftest:
     python3 scripts/regime-witness.py selftest

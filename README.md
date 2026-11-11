@@ -1,40 +1,42 @@
 # Whimbrel
 
-A minimal RISC-V (rv64gc) unikernel written from scratch in Rust: QEMU's
-`virt` machine, OpenSBI (or the project's own M-mode shim), Sv39 paging,
-single hart, single address space, one application compiled into the
-image and run in U-mode over a seven-syscall interface (`write`, `exit`,
-`sbrk`, `gettime`, `yield`, `recv`, `send`). At boot it brings up a hand-rolled
-virtio-net driver and network stack (Ethernet, ARP, IPv4, ICMP, UDP,
-TCP; smoltcp deliberately rejected) and serves one pinned HTTP
-response.
+Whimbrel is a small RISC-V (rv64gc) unikernel in Rust, written from scratch for QEMU's `virt` machine. There is one application compiled into the image. In the normal one-shot run it serves a pinned HTTP response and exits; the persistent demo has a separate command below.
 
-The project's claims live in its measurement work: campaigns are
-pre-registered with falsifiers before they run, gates fail closed, and
-every published number regenerates from pinned git objects.
+## Run the demo
 
-**Status:** M0-M3 (boot, traps, paging, U-mode execution, virtio-net,
-HTTP) are done and merged. M4 (evaluation) is in progress, and it is
-one milestone carrying both the measurement apparatus (harness,
-campaigns, generated exhibits) and kernel changes of its own: the
-phase-stamp instrumentation, the T4.7 M-mode shim with its allowlisted
-kernel seams, and the `check_dtb` boot assert. The campaigns below are
-measured and pinned; the technical report lands last. Remaining M4 work
-is tracked in [docs/PLAN.md](docs/PLAN.md).
+The environment is described in [docs/SETUP.md](docs/SETUP.md). Use the Rust toolchain pinned in `rust-toolchain.toml`, with `qemu-system-riscv64`, `just` and `tshark` installed. The tests check packet captures as well as boot output, so `tshark` is needed for the gates.
 
-## Results
+```bash
+just build     # cross-compile the kernel
+just test      # headless gate: boot markers, curl the HTTP demo, pcap assertions
+just run       # boot the one-shot image: serve one GET, then exit
+just run-http  # persist the image on host :8080 …
+curl -v http://127.0.0.1:8080/   # … and fetch it from another terminal
+```
 
-All numbers are medians on **RISC-V under QEMU TCG software emulation
-(no KVM)** on one pinned bench host (AMD Ryzen 7 7800X3D, QEMU 10.2.1;
-[machine-spec](report/exhibits/machine-spec.md)), n=60 recorded per arm,
-warmup excluded. Absolute times here are not comparable to published
-x86+KVM figures, which run roughly 5-10× lower; the ratio is what
-transfers, because the emulation penalty applies to both arms
-([cross-system](report/exhibits/cross-system.md)).
+Use `just --list` to see the remaining recipes. `test-panic`, `test-net-tcp` and `check-utext` run individual gates; `just debug` and `just gdb` give the GDB-stub workflow. Running the demo and reproducing a measurement campaign have different host requirements. See "Check the measurements" below for the measurement commands and host checks.
 
-Boot to first HTTP byte (E0→E4, QEMU process spawn to first response
-byte at the client) from one campaign with all arms interleaved
-([cross-system-t48c](report/exhibits/cross-system-t48c.md)):
+## Inside the image
+
+The kernel has one hart, one address space and Sv39 paging. It can boot with OpenSBI or the project's own M-mode shim. The application runs in U-mode and calls the kernel through seven syscalls: `write`, `exit`, `sbrk`, `gettime`, `yield`, `recv` and `send`.
+
+At boot, the kernel starts its hand-written virtio-net driver and network stack. The stack handles Ethernet, ARP, IPv4, ICMP, UDP and TCP. Doing this without smoltcp was a deliberate project choice.
+
+## Where the project stands
+
+The kernel milestones M0-M3 are complete and merged: boot, traps, paging, U-mode execution, virtio-net and HTTP. M4 covers evaluation: the harness, measurement campaigns and generated exhibits. The kernel changes in M4 are phase-stamp instrumentation, the T4.7 M-mode shim with its allowlisted kernel seams, and the `check_dtb` boot assert.
+
+The campaigns discussed here have been measured and pinned.
+
+## Read the timings
+
+These are measurements of one workload on one emulated machine shape. For the measured one-shot workload, Whimbrel serves a request and exits. All timing values below are medians from a pinned AMD Ryzen 7 7800X3D bench host running QEMU 10.2.1; see [machine-spec](report/exhibits/machine-spec.md). There are n=60 recorded runs per arm, with warmup excluded.
+
+The guest runs as **RISC-V under QEMU TCG software emulation, with no KVM**. Published unikernel and microVM boot figures use x86_64 or aarch64 with KVM and different timing edges. Their absolute times cannot be compared directly with these. The [cross-system](report/exhibits/cross-system.md) ratios compare arms within this emulated setup; they do not establish what the ratios would be on another host or under KVM.
+
+### From process spawn to the first HTTP byte
+
+E0→E4 starts when the QEMU process is spawned and ends when the first response byte reaches the client. This is the boot-to-first-HTTP-byte interval. All arms in the table were interleaved in one campaign, [cross-system-t48c](report/exhibits/cross-system-t48c.md).
 
 | system | E0→E4 median | IQR |
 |---|---:|---:|
@@ -43,47 +45,25 @@ byte at the client) from one campaign with all arms interleaved
 | Linux, minimal, tuned in good faith (Buildroot 2026.02.3 / kernel 6.18.7, config published) | 263.75 ms | 1.43 ms |
 | Linux, stock defconfig | 923.70 ms | 3.33 ms |
 
-Under those conditions (QEMU TCG software emulation on RISC-V, no KVM,
-same host and same QEMU for every arm), the trimmed Linux baseline takes
-**5.1×** the unikernel's time to first HTTP byte and stock takes
-**17.8×**, and the comparison carries a known measured bias toward
-Whimbrel: the D-0075 `/init` neighbor-table round trip adds 2.87 ms to
-every Linux row, published in the exhibit. Beside that, a second
-disclosed Linux-side component is image-size scaling of the pre-guest
-slice S: roughly **6–13 ms (trimmed)** and **10–20 ms (stock)** of
-E0→E4 that Whimbrel does not pay (D-0082; a bracket — two read-only
-methods agreed on direction and not on precision; not regenerable
-from the pinned CSVs). Charging a small image is a real unikernel
-property; this does not retract the ratio. This is largely a result of
-the single-purpose structure.
+Trimmed Linux took **5.1×** the Whimbrel time to reach that first byte; stock Linux took **17.8×**. The host and QEMU were the same for all arms: RISC-V TCG, no KVM. There is a measured bias in Whimbrel's favor here. The D-0075 `/init` neighbor-table round trip adds 2.87 ms to every Linux row, as disclosed in the exhibit.
 
-Two more measured results:
+The ratios also include image loading. Linux has a pre-guest component in slice S that scales with image size and that Whimbrel does not incur. D-0082 brackets it at roughly **6–13 ms for trimmed Linux** and **10–20 ms for stock Linux**, within E0→E4. Those brackets came from two read-only methods which agreed on direction but differed in precision. They cannot be regenerated from the pinned CSVs. The cost has not been subtracted from the ratios: loading a small image is part of this single-purpose design.
 
-- **Firmware removal**
-  ([t47-firmware](report/exhibits/t47-firmware.md)). Under the same
-  QEMU TCG conditions, replacing OpenSBI with the project's 320-byte
-  M-mode boot shim in the `-bios` slot cuts fast-boot E0→E4 from
-  52.27 / 52.19 ms to 28.58 / 28.50 ms per batch (−23.69 ms, 1.8×), of
-  which only −0.714 ms is guest-side work; the rest is the removed
-  firmware window, a volatile quantity reported per batch and never
-  pooled. This is its own campaign: per the repo's same-campaign rule
-  its ratio is computed only against its own OpenSBI arm, never against
-  the table above.
-- **Guest kernel work** ([edges](report/exhibits/edges.md),
-  [phase-decomposition](report/exhibits/phase-decomposition.md)).
-  E2→E3g (first kernel instruction to the HTTP response published)
-  went from 21.42 ms at the pre-optimization freeze to 6.43 ms after a
-  ladder of pre-registered optimization rungs. Every phase in that
-  interval is attributed; none exceeds 19% of the total.
+### Two other campaigns
 
-**What this is not.** As an operating system, Whimbrel is not
-very significant. It runs one workload on one emulated machine
-shape, serves one request, then exits. The major artifact is the
-measurement discipline. The decision log keeps the misses next to
-the wins: a headline metric retired when analysis showed its name
-promised something it did not measure, an aborted campaign, a
-diagnosis refuted by data already on disk, an expectation model
-retired after three consecutive misses in the same direction.
+In the [firmware campaign](report/exhibits/t47-firmware.md), the project's M-mode boot shim replaces OpenSBI in QEMU's `-bios` slot. D-0079 records the shim as 320 bytes. Under the same QEMU TCG conditions, fast-boot E0→E4 changes from 52.27 / 52.19 ms to 28.58 / 28.50 ms per batch, a signed change of −23.69 ms (1.8×). Use this campaign's own OpenSBI arm for that comparison, not the earlier table.
+
+The pooled change in guest kernel work, E2→E3g, accounts for −0.714 ms of the change. The rest includes firmware and host-side effects; it is not an independent measurement of time spent executing firmware. The firmware window is volatile, so its values are reported per batch and never pooled. The [exhibit reading notes](docs/EXHIBIT-READING-NOTES.md) explain the historical decomposition's sign convention and limits.
+
+The kernel-work result uses another interval: E2→E3g, from the first kernel instruction to publication of the HTTP response. It went from 21.42 ms at the pre-optimization freeze to 6.43 ms after the preregistered optimization ladder. Every phase in that interval is attributed, with no phase above 19% of the total. The details are in [edges](report/exhibits/edges.md) and [phase-decomposition](report/exhibits/phase-decomposition.md).
+
+## Check the measurements
+
+Measurement discipline is the main contribution of this project. Each campaign is preregistered before it runs, including what would falsify its claim, and the gates fail closed. The claims here are backed by those campaigns. The decision log also retains the unsuccessful work: a headline metric retired because its name implied something it did not measure, an aborted campaign, a diagnosis refuted by data already on disk, and an expectation model retired after three consecutive misses in the same direction.
+
+To regenerate the main exhibits, use `just report-exhibits`. It reads pinned git objects, not the changing working tree. The regime witness has a separate generator, `python3 scripts/regime-witness.py`. For the D-0070 pcap exhibit, use `just d0070-pcap-pass`; that also needs the saved packet captures on the bench host. A figure that cannot be reproduced from pins alone states the limitation where it appears.
+
+Running a measurement campaign is a different job from regenerating its tables. The `just bench-*` campaigns fail closed away from the dedicated bench host. D-0055 requires bare metal, the performance governor, SMT off, boost off and zero steal. The harness refuses a report-grade batch if those controls do not hold and records them with every batch.
 
 ## What's in the repo
 
@@ -95,53 +75,26 @@ retired after three consecutive misses in the same direction.
 | `linker.ld` | image layout, including the dedicated user sections `check-utext` enforces |
 | `scripts/` | the harness: boot gates, pcap assertions, `bench.py`, the exhibit generator |
 | `bench/linux/` | pinned inputs for the Linux baseline: Buildroot pin, kernel-config fragments, `/init` |
-| `docs/` | `PLAN.md` (milestones, acceptance tests), `DECISIONS.md` (the 80-entry decision log), `DEBUGGING.md` (rv64/QEMU field guide), `GLOSSARY.md`, `SETUP.md` |
-| `report/` | generated exhibits (`report/exhibits/`); the technical report itself is still in draft |
-| `results/` | latest-run CSVs, overwritten per run; report data lives only in pinned git objects (see [results/README.md](results/README.md)) |
+| `docs/` | `DECISIONS.md` (the 87-entry decision log), `DEBUGGING.md` (rv64/QEMU field guide), `GLOSSARY.md`, `SETUP.md`, `EXHIBIT-READING-NOTES.md`, `AUDIT-2026-08.md` (the pre-M4 audit, with its pre-registered predictions) |
+| `report/` | generated exhibits (`report/exhibits/`) |
+| `results/` | latest-run CSVs, overwritten per run; campaign data lives only in pinned git objects (see [results/README.md](results/README.md)) |
 | `justfile` | every gate and campaign as a recipe |
-
-## Build and run
-
-Environment ([docs/SETUP.md](docs/SETUP.md)): `qemu-system-riscv64`,
-`just`, `tshark` (the gates assert on packet captures), and the Rust
-toolchain pinned by `rust-toolchain.toml`.
-
-```bash
-just build     # cross-compile the kernel
-just test      # headless gate: boot markers, curl the HTTP demo, pcap assertions
-just run       # boot the one-shot image: serve one GET, then exit
-just run-http  # persist the image on host :8080 …
-curl -v http://127.0.0.1:8080/   # … and fetch it from another terminal
-```
-
-`just --list` shows the rest: per-gate recipes (`test-panic`,
-`test-net-tcp`, `check-utext`, …), `just debug` / `just gdb` for the
-GDB stub, and `just report-exhibits`, which regenerates every report
-table from pinned git objects. The measurement campaigns
-(`just bench-*`) fail closed anywhere but the dedicated bench host:
-bare metal, performance governor, SMT off, boost off, zero steal
-(D-0055).
 
 ## Reading further
 
-- [report/exhibits/](report/exhibits/): every generated table,
-  captioned with the exact git objects it reads and the command that
-  regenerates it
-- The technical report (methodology, results, threats to validity) is
-  still in draft.
-- [docs/DECISIONS.md](docs/DECISIONS.md): every nontrivial choice
-  (alternatives, rationale, consequences, and, where it happened, the
-  refutation)
-- [docs/DEBUGGING.md](docs/DEBUGGING.md): symptom → cause field guide
-  for rv64/QEMU work
-- [results/README.md](results/README.md): how measurement data is
-  pinned and why the working tree is never a source
+- [docs/EXHIBIT-READING-NOTES.md](docs/EXHIBIT-READING-NOTES.md) explains corrections and interpretation limits for the preserved campaign exhibits.
+- [report/exhibits/](report/exhibits/) contains the generated tables. Each caption names the exact git objects used and the command that regenerates the table.
+- [docs/DECISIONS.md](docs/DECISIONS.md) records every nontrivial choice: alternatives, rationale, consequences and any subsequent refutation.
+- [docs/DEBUGGING.md](docs/DEBUGGING.md) is the symptom → cause field guide for rv64/QEMU work.
+- [results/README.md](results/README.md) explains the measurement-data pins and why the working tree is never a source.
+
+## How this was built
+
+I signed off the preregistrations before their campaigns ran (D-0062, D-0079). My dispositions are in the decision log, including the decision to sustain a campaign abort (D-0079). Every campaign cited here ran on the dedicated bench host, with the D-0055 controls checked and recorded for each batch. Scripts generate the exhibit tables from pinned git objects; the numbers are not entered by hand.
 
 ## License
 
 `SPDX-License-Identifier: MIT OR Apache-2.0`. Dual-licensed under
 [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
 
----
-
-Built in part with AI assistance.
+Developed in part with AI assistance.

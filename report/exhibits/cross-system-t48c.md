@@ -17,6 +17,8 @@ This is a cmdline tuning choice, not a config trim. A deployer who did not know 
 | linux | trimmed | 60 | 263.75 ms | 1.43 ms | 262.03 ms | 286.0 µs |
 | linux | trimmed-instrumented | 60 | 287.41 ms | 1.84 ms | 285.35 ms | 291.5 µs |
 | linux | stock | 60 | 923.70 ms | 3.33 ms | 919.20 ms | 215.5 µs |
+Image bytes (D-0083 A2): column pending. The record `results/image-bytes.csv` is not yet pinned (`IMAGE_BYTES_REV` is unset in `scripts/report-exhibits.py`); once the bench-host measurement is committed and pinned, this table gains the column and this line goes away.
+
 
 Ratios are E0→E4 medians under TCG; the emulation penalty applies to both arms (see the T4.8 exhibit for the KVM-comparability caveat, unchanged):
 
