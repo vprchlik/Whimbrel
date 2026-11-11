@@ -39,7 +39,7 @@ package so an older host keeps working. After install,
 `command -v qemu-system-riscv64` must succeed.
 
 Version note: any QEMU ≥ 7.x is fine (Ubuntu 22.04+ ships qemu ≥ 6.2 which
-also works). The exact version in use gets recorded in the M4 report for
+also works). The exact version in use gets recorded with the measurements for
 reproducibility: `qemu-system-riscv64 --version` plus the binary hash the
 bench harness records.
 
@@ -154,8 +154,8 @@ report-grade numbers never come from one.
 
 ## 7. Dedicated measurement host (D-0055)
 
-Development and `just test` run anywhere QEMU works. **Every number in the
-M4 report** comes from one dedicated Ubuntu machine that meets the checks
+Development and `just test` run anywhere QEMU works. **Every reported
+number** comes from one dedicated Ubuntu machine that meets the checks
 below. T4.2 stamps from a KVM pod are ladder-ordering only. On Ubuntu
 26.04+ extra host steps sit outside `scripts/install.sh` (cloud agents
 never run `just linux-build`): the QEMU package split in §1, the
@@ -178,8 +178,8 @@ on this host, not a recorded curiosity.
 
 The provisioned machine (Ubuntu 26.04, Ryzen 7 7800X3D, 8 cores SMT off,
 boost off, QEMU 10.2.1, steal 0) is the source of the turbo-off numbers
-in D-0055. Copy the harness machine-spec block into the report, not this
-sentence.
+in D-0055. Cite the harness machine-spec block
+(`report/exhibits/machine-spec.md`), not this sentence.
 
 ### Host packages for `just linux-build`
 
@@ -333,11 +333,10 @@ necessary, not sufficient. The stability criterion is unchanged
 (two interleaved 30-trial batches, max(2%, 200 µs)); these host
 checks are additional and do not widen it.
 
-### Machine-spec block (report methodology)
+### Machine-spec block
 
-Record once per host, and re-record if any field changes, in the report's
-methodology section (not typed from memory — copy from the batch header
-the harness writes):
+Record once per host, and re-record if any field changes (not typed from
+memory: copy from the batch header the harness writes):
 
 ```
 nproc:                 <os.cpu_count()>

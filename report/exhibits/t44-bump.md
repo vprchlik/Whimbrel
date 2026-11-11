@@ -10,7 +10,7 @@ T4.4 bump / lazy free-list campaign (D-0065), kept as the pre-superpage pin. Sou
 | release-fast-boot | E0→E4 | 67.05 ms | 54.52 ms | −12.53 ms | -19% |
 | release-default | E2→E3g | 94.88 ms | 78.25 ms | −16.63 ms | -18% |
 
-### Phase medians the report quotes
+### Phase medians
 
 | phase | profile | baseline | T4.4 | Δ% | what it is |
 |---|---|---:|---:|---:|---|
@@ -21,4 +21,4 @@ T4.4 bump / lazy free-list campaign (D-0065), kept as the pre-superpage pin. Sou
 | freeze | fast | 7.5 µs | 7.3 µs | -3% | the T4.6 rung's before — a different pin from the baseline column, not a conflict |
 | freeze | safe | 4.88 ms | 100.0 µs | -98% | safe profile prints `free_count()`; D-0065 outcome row |
 
-The fast `freeze` cell is the value the draft's matched-TCG-pair discussion quotes as the T4.6 rung's before. It sits beside a baseline column from a different campaign pin; the two values are two pins, not a disagreement.
+The fast `freeze` cell is the T4.6 rung's before. It sits beside a baseline column from a different campaign pin; the two values are two pins, not a disagreement.

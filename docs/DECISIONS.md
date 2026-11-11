@@ -7717,3 +7717,65 @@ D-0011 onward are working decisions made under those constraints.
   gate 7 lines gain one each. Revisit: version 2 removes the
   outstanding-gate sentences and the pending column once the
   sitting's commits are in.
+
+## D-0087: Withdraw the report draft and the working papers from the tree; the exhibits and this log stay
+- Date: 2026-11-11    Status: accepted 2026-11-11
+- **Context:** D-0064 made a technical report the M4 artifact, and
+  D-0085 and D-0086 set how it would be posted. The draft reached a
+  second audit and a revision and was not signed off. No version was
+  posted: no release tag was made and no DOI was reserved. The tree
+  also carried the working papers of the build: the task plan, the
+  second audit, and the bench-host runbook of 2026-10-13.
+- **Decision:** on the owner's decision of 2026-11-11, these files
+  leave the tree:
+  - the report: `report/draft.md`, `report/references-read.md`,
+    `report/appendix-regenerate.md`, `report/metadata.toml`, and the
+    PDF build that served only them (`scripts/report-pdf.py`,
+    `scripts/requirements-report.txt`);
+  - the plan: `docs/PLAN.md`;
+  - the second audit: `docs/AUDIT-2026-10.md`;
+  - the runbook: `docs/RUNBOOK-bench-host-2026-10-13.md`.
+
+  `report/exhibits/`, every generator, pin, and tag behind it, this
+  log, and `docs/AUDIT-2026-08.md` stay. History is not rewritten.
+  Every withdrawn file is in the tree at commit `e833e29` (for
+  example `git show e833e29:docs/PLAN.md`) and is unchanged from
+  there to the parent of the commit that carries this entry.
+- **Alternatives considered:** finishing and posting the report
+  (declined by the owner; the measured claims rest on the generated
+  exhibits, each of which names its pins). Keeping the files marked
+  unfinished (rejected: the tree would go on promising a report and
+  tracking tasks that are not being worked). Withdrawing the August
+  audit as well (rejected: `report/exhibits/phase-decomposition.md`
+  cites its findings 4 and 11, D-0057's pre-registered predictions
+  are its findings 10 and 12, and the justfile, the harness comments,
+  and `results/README.md` cite others by number). Rewriting history
+  (rejected: history is never rewritten here).
+- **Rationale:** the project's claims are its measurements. They
+  stand on the exhibits, which regenerate from pinned git objects
+  without any withdrawn file, and on this log, which holds the
+  pre-registrations and the owner's dispositions. A reader checking a
+  number needs neither the draft nor the working papers.
+- **Consequences:**
+  - The posting sequence of D-0085 and D-0086 is not carried out.
+    D-0084's related-work section and reference list leave with the
+    draft. D-0083's pin map, the "Pins" section of the regeneration
+    appendix, leaves with the appendix; each exhibit's caption names
+    its pins.
+  - D-0064's convergence gate, whose normative copy was in the plan,
+    leaves the tree with it. This entry does not walk the gate or
+    declare it passed.
+  - The runbook's sitting left no commit: `IMAGE_BYTES_REV` is unset
+    and the exhibits print the image-bytes column as pending.
+  - Entries above that cite a withdrawn file stay as written; read
+    each such path at `e833e29`. Task labels (T4.8b, "PLAN M1 concept
+    9") stay as names in source comments, exhibits, and this log, and
+    `docs/GLOSSARY.md` gains "task labels" to say what they name.
+  - The README no longer points at a report or the plan and keeps its
+    KVM-comparability caution in its own words. The glossary loses
+    "citation record" and its citations of the draft's Threats items
+    and the plan's concepts. `docs/DEBUGGING.md` states the `satp`
+    checklist without the plan, and `docs/SETUP.md` names the exhibits
+    where it named the report. The generator's prose in
+    `cross-system-current.md` and `t44-bump.md` no longer mentions the
+    report or the draft; no measured value changes.

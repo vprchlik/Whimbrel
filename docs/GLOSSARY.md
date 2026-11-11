@@ -47,15 +47,6 @@ use it. A wrong checksum is a silent drop at slirp: hung curl, clean serial.
 The pcap asserts `tcp.checksum.status` good; the kernel self-test is
 `CHECKSUM OK`.
 
-**citation record.** `report/references-read.md`, the appendix D-0084
-adds beside the reference list: for each reference, the URL read, the
-passage relied on, the conditions as the source states them, and the
-date and time read. It holds cited work to the rule the regeneration
-appendix holds Whimbrel's own numbers to: an external number appears
-only with its conditions (ISA, hypervisor or emulator, edges, hardware)
-in the same sentence, and a reference whose conditions could not be
-read carries no number.
-
 **cliff crossing.** A boot where the guest's first wire TX arrives after
 slirp has already dropped the ARP-pending frame (~1 s), so the queued
 hostfwd SYN is only retried on slirp's ~6 s RTO grid and E0→E4 jumps by
@@ -72,7 +63,7 @@ trap state; which CSRs are accessible depends on the current privilege level.
 from the trial's packet capture on its own clock (`d_fin_ns`; D-0070).
 The client closes right after its first nonempty `recv`, so D_fin
 bounds publish-to-client delivery from above. It is the delivery figure
-the report uses where the retired E3w→E4 once stood, with one
+the exhibits use where the retired E3w→E4 once stood, with one
 definition on every row of every system.
 
 **DBCN (Debug Console).** The SBI extension (EID `0x4442434E`) that replaces
@@ -175,7 +166,7 @@ it. It is the quantity the pre-guest slice S scales with (D-0082).
 sha256 into a committed record, `results/image-bytes.csv`; the exhibit
 generator re-checks each hash against the pin's CSV and fails closed,
 and until the record is pinned the exhibits print the column as pending
-(PLAN T4.10 status).
+(D-0083 A2).
 
 **initramfs.** A cpio archive the Linux kernel unpacks into a RAM
 filesystem at boot and runs as its root. The Linux arms' initramfs is
@@ -212,9 +203,9 @@ slot that sets the PMP catch-all, transcribes OpenSBI's delegation
 masks, enables counters and Sstc, installs both trap diagnostics, and
 `mret`s into the S-mode kernel. The campaign uses a kernel variant
 built with `bios-none` for the timer, console and other firmware seams;
-it is not byte-identical to the OpenSBI-lane kernel. The October audit
-requested artifact-level verification of the recorded blob size
-([finding 10](AUDIT-2026-10.md)); the extraction script bounds size but
+it is not byte-identical to the OpenSBI-lane kernel. The October 2026
+audit (withdrawn from the tree, D-0087) requested artifact-level
+verification of the recorded blob size; the extraction script bounds size but
 does not assert an exact byte count. No resident services — after
 `mret`, any M-mode trap is a bug and prints itself. Checkpoint letters
 `ZPDCTVM` bisect a silent boot to one block.
@@ -253,7 +244,7 @@ Headline E2→E3g uses a client retrying before E0; `just test`'s
 curl-after-`HTTP READY` E3g is harness wait (D-0043).
 
 **median, IQR, minimum.** Every reported metric carries these three statistics
-(D-0055; PLAN M4 concept 1). Comparisons, including before/after comparisons,
+(D-0055). Comparisons, including before/after comparisons,
 use the median of the recorded trials. The IQR describes their spread from
 the 25th to the 75th percentile, computed inclusive (type 7). Noise on this
 platform is one-sided and additive, so the minimum approaches the floor and
@@ -280,7 +271,7 @@ per byte varies with per-boot host state, this cell is day-scoped: comparisons
 across campaigns require matching serial regimes (D-0078;
 `report/exhibits/cross-system-t48c.md`). Whimbrel's observer effects are the
 timestamp overhead measured on every boot by `stamp_a` and `stamp_b`, and
-the post-response `PHASE` dump (Threats item 10).
+the post-response `PHASE` dump.
 
 **OpenSBI.** The reference open-source implementation of the SBI spec — the
 M-mode firmware QEMU bundles as `-bios default`. It initializes the machine,
@@ -291,8 +282,8 @@ then stays resident to service our `ecall`s.
 depends. A data pin identifies a git object through an annotated tag such as
 `baseline-t4.3` or a full commit hash; generators read its `results/*.csv`
 with `git show`. The working tree and `HEAD` are never pins, because the
-harness overwrites the CSVs on every run (D-0067; the Pins section of
-`report/appendix-regenerate.md`). Input pins also include the QEMU version,
+harness overwrites the CSVs on every run (D-0067; each exhibit's caption
+names its pins). Input pins also include the QEMU version,
 the Buildroot release and tarball sha256 (`bench/linux/PIN`), the artifact
 hashes in `bench/linux/MANIFEST`, and the Unikraft commit (D-0063).
 
@@ -311,12 +302,12 @@ access-faults.
 VPN[2]/VPN[1]/VPN[0] (9 bits each) plus a 12-bit offset; a leaf PTE's PPN
 concatenated with that offset is the PA. `satp.PPN` is the root table's
 address shifted right 12 — writing the address itself is a factor-of-4096
-error (PLAN M1 concept 11).
+error.
 
 **PTE (page-table entry).** A 64-bit Sv39 word: V/R/W/X/U/G/A/D in the low
 bits, PPN in [53:10]. In a valid PTE, R or X marks a leaf (including a 2 MiB
 or 1 GiB superpage). W without R is reserved and rejected by the walker.
-A non-leaf must have V=1 and R=W=X=0 (concept 11.4). The RAM interior uses 2 MiB L1 leaves
+A non-leaf must have V=1 and R=W=X=0. The RAM interior uses 2 MiB L1 leaves
 (D-0059); 4 KiB L0 everywhere the map distinguishes at 4 KiB grain.
 1 GiB L2 leaves are still rejected (D-0026).
 
@@ -374,7 +365,7 @@ regime is campaign-scoped and the stability criterion cannot see it.
 Numbers that contain in-window console output, the safe profile and the
 observer-cost cell, compare across campaigns only when the regimes
 agree; `release-fast-boot` prints nothing in its window and is not
-exposed (Threats item 21; `report/exhibits/regime-witness.md`).
+exposed (`report/exhibits/regime-witness.md`).
 
 **sfence.vma.** The instruction that synchronizes the TLB with page-table
 memory: after changing PTEs or `satp`, older translations may still be cached
@@ -440,6 +431,14 @@ translated through three levels of 512-entry page tables to 4 KiB pages, with
 512 GiB of address space — absurdly more than our 128 MiB of RAM, which is
 why we don't need Sv48.
 
+**task labels (M0 to M4, T4.8b).** Names from the project plan: M0 to M4
+are its milestones and T*m*.*n* its tasks. Campaigns took the label of the
+task that ran them (T4.8b, T4.8c), and the decision log, the exhibits and
+source comments use the labels as names; a comment's "PLAN M1 concept 9"
+is a numbered prerequisite concept in that milestone's plan section. The
+plan was withdrawn from the tree on 2026-11-11 (D-0087) and is in history
+as `docs/PLAN.md` at commit `e833e29`.
+
 **TCG (Tiny Code Generator).** QEMU's software accelerator. Its just-in-time
 translator converts guest instructions into host instructions at run time
 and caches the result. QEMU uses it by default when no hardware accelerator
@@ -447,8 +446,7 @@ is named. Every measurement in this project uses TCG, with no KVM.
 Compute-dense and MMIO-dense work incur different emulation costs, so their
 phase shares would differ on hardware. The reported ratios compare arms
 on the measured host; these measurements do not establish that the ratios
-transfer to other hosts or hardware acceleration (PLAN M4 concept 2;
-Threats item 1; D-0083 A3; D-0084).
+transfer to other hosts or hardware acceleration (D-0083 A3; D-0084).
 
 **TIME (SBI).** The SBI extension we use to arm the supervisor timer
 (`sbi_set_timer`, absolute `rdtime` deadline). Re-arming is also how S-mode
@@ -490,12 +488,12 @@ boundary and a 5-syscall interface so the isolation cost can be measured
 
 **vDSO (virtual dynamic shared object).** A small shared library the
 Linux kernel maps into every process so that calls such as
-`clock_gettime` run in user mode without a trap. PLAN T4.10 planned to
+`clock_gettime` run in user mode without a trap. Task T4.10 planned to
 time Linux's `clock_gettime` both ways, forced through the trap path
 with `syscall(SYS_clock_gettime)` and through the vDSO, the latter
 approximating the function-call system call a single-privilege
 unikernel gets, against Whimbrel's trap-based `gettime` (D-0010). D-0083
-A2 descoped that measurement, and the report's future work carries it.
+A2 descoped that measurement.
 
 **virtio / virtio-mmio.** A standard family of paravirtual devices where guest
 and hypervisor share ring buffers (virtqueues) in guest memory instead of
@@ -514,7 +512,7 @@ guest, both read from the trial's packet capture on its own clock
 (`w_ns`; D-0070): the time an already-accepted connection waits for the
 guest to boot far enough to answer. It spans the guest's whole boot to
 first transmit, so it fuses boot time with any egress delay, and only a
-guest-internal stamp separates them (Threats item 19). It appears
+guest-internal stamp separates them. It appears
 beside Whimbrel rows only, since next to a Linux row it would be boot
 wait under another name.
 

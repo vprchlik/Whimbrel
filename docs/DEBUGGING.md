@@ -172,7 +172,7 @@ never reached your code. In rough order of likelihood:
    "impossibly" — or works in QEMU and would fail on hardware. Fence after
    every PTE change (project rule).
 6. Missing A/D bits in PTEs → cause 13/15 on first touch, on QEMU configs that
-   don't set them in hardware. We set A|D on all kernel leaves (PLAN M1/T1.5).
+   don't set them in hardware. We set A|D on all kernel leaves (D-0019).
 7. Timer interrupt enabled before `stvec` points at a real handler.
 8. **Post-T1.3, `park()` is not quiescence.** `park` is `wfi`. With `sie.STIE`
    set, the hart wakes every 10 ms, runs the timer handler, and `sret`s into
@@ -206,12 +206,11 @@ so both channels here are outside the guest:
    under the new tables. Read the *first* block, not the hundredth — the rest
    are the loop.
 2. **Monitor `info mem`.** This dumps the decoded Sv39 tables. Compare it
-   against the linker map and against the expected permissions in PLAN.md's
-   M1 memory-map table. Answering "did I map what I think I mapped" takes one
+   against the linker map and against the permissions the boot-time probes
+   expect for each region (`src/page.rs`). Answering "did I map what I think I mapped" takes one
    command and beats an hour of re-reading the mapping code.
-3. **Work prerequisite concept 11 as a checklist** (PLAN.md, M1). It
-   enumerates the twelve conditions that must hold before the `csrw` retires,
-   in roughly the order they break: `MODE`, the `PPN` shift, the root entry,
+3. **Work the twelve conditions as a checklist.** All of them must hold
+   before the `csrw` retires. In roughly the order they break: `MODE`, the `PPN` shift, the root entry,
    non-leaf `R=W=X=0`, leaf `X`, leaf `U=0`, `A`/`D`, identity, walker
    reachability, stack and `ra`, the `stvec` page, and the interrupt window.
 4. **Suspect the two silent ones first.** `satp.MODE=0` means paging never
@@ -285,8 +284,7 @@ L0 because those VAs remain in the 4 KiB region.
 6. **Kernel stack overflow — a hang with no output. Known unrecoverable.**
    See below.
 7. **Undelegated illegal instruction from U — firmware dump, hart parked,
-   no `task N killed` line.** Cause 2 is not in `MEDELEG` (PLAN M1 concept 9,
-   D-0034). A task that executes `unimp`, or an FP op with `FS=Off`, traps
+   no `task N killed` line.** Cause 2 is not in `MEDELEG` (D-0034). A task that executes `unimp`, or an FP op with `FS=Off`, traps
    to OpenSBI, not to us. Symptom: an OpenSBI "unhandled trap" dump
    (`mcause=2`, `mepc` in `.utext`) and a parked hart; QEMU may sit there
    until the hang-guard. There is no kernel `PANIC`, no `task N killed`,

@@ -24,15 +24,15 @@ At boot, the kernel starts its hand-written virtio-net driver and network stack.
 
 ## Where the project stands
 
-The kernel milestones M0-M3 are complete and merged: boot, traps, paging, U-mode execution, virtio-net and HTTP. M4 is still in progress. It covers evaluation: the harness, measurement campaigns and generated exhibits. The kernel changes in M4 are phase-stamp instrumentation, the T4.7 M-mode shim with its allowlisted kernel seams, and the `check_dtb` boot assert.
+The kernel milestones M0-M3 are complete and merged: boot, traps, paging, U-mode execution, virtio-net and HTTP. M4 covers evaluation: the harness, measurement campaigns and generated exhibits. The kernel changes in M4 are phase-stamp instrumentation, the T4.7 M-mode shim with its allowlisted kernel seams, and the `check_dtb` boot assert.
 
-The campaigns discussed here have been measured and pinned. The technical report is the last M4 deliverable and is still unfinished; [docs/PLAN.md](docs/PLAN.md) tracks what remains.
+The campaigns discussed here have been measured and pinned.
 
 ## Read the timings
 
 These are measurements of one workload on one emulated machine shape. For the measured one-shot workload, Whimbrel serves a request and exits. All timing values below are medians from a pinned AMD Ryzen 7 7800X3D bench host running QEMU 10.2.1; see [machine-spec](report/exhibits/machine-spec.md). There are n=60 recorded runs per arm, with warmup excluded.
 
-The guest runs as **RISC-V under QEMU TCG software emulation, with no KVM**. Published unikernel and microVM boot figures use x86_64 or aarch64 with KVM and different timing edges. Their absolute times cannot be compared directly with these. The Related work section of [report/draft.md](report/draft.md) discusses this distinction. The [cross-system](report/exhibits/cross-system.md) ratios compare arms within this emulated setup; they do not establish what the ratios would be on another host or under KVM.
+The guest runs as **RISC-V under QEMU TCG software emulation, with no KVM**. Published unikernel and microVM boot figures use x86_64 or aarch64 with KVM and different timing edges. Their absolute times cannot be compared directly with these. The [cross-system](report/exhibits/cross-system.md) ratios compare arms within this emulated setup; they do not establish what the ratios would be on another host or under KVM.
 
 ### From process spawn to the first HTTP byte
 
@@ -75,23 +75,22 @@ Running a measurement campaign is a different job from regenerating its tables. 
 | `linker.ld` | image layout, including the dedicated user sections `check-utext` enforces |
 | `scripts/` | the harness: boot gates, pcap assertions, `bench.py`, the exhibit generator |
 | `bench/linux/` | pinned inputs for the Linux baseline: Buildroot pin, kernel-config fragments, `/init` |
-| `docs/` | `PLAN.md` (milestones, acceptance tests), `DECISIONS.md` (the 85-entry decision log), `DEBUGGING.md` (rv64/QEMU field guide), `GLOSSARY.md`, `SETUP.md` |
-| `report/` | generated exhibits (`report/exhibits/`); the technical report itself is still in draft |
-| `results/` | latest-run CSVs, overwritten per run; report data lives only in pinned git objects (see [results/README.md](results/README.md)) |
+| `docs/` | `DECISIONS.md` (the 87-entry decision log), `DEBUGGING.md` (rv64/QEMU field guide), `GLOSSARY.md`, `SETUP.md`, `EXHIBIT-READING-NOTES.md`, `AUDIT-2026-08.md` (the pre-M4 audit, with its pre-registered predictions) |
+| `report/` | generated exhibits (`report/exhibits/`) |
+| `results/` | latest-run CSVs, overwritten per run; campaign data lives only in pinned git objects (see [results/README.md](results/README.md)) |
 | `justfile` | every gate and campaign as a recipe |
 
 ## Reading further
 
 - [docs/EXHIBIT-READING-NOTES.md](docs/EXHIBIT-READING-NOTES.md) explains corrections and interpretation limits for the preserved campaign exhibits.
 - [report/exhibits/](report/exhibits/) contains the generated tables. Each caption names the exact git objects used and the command that regenerates the table.
-- The technical report, covering methodology, results and threats to validity, is still a draft.
 - [docs/DECISIONS.md](docs/DECISIONS.md) records every nontrivial choice: alternatives, rationale, consequences and any subsequent refutation.
 - [docs/DEBUGGING.md](docs/DEBUGGING.md) is the symptom → cause field guide for rv64/QEMU work.
 - [results/README.md](results/README.md) explains the measurement-data pins and why the working tree is never a source.
 
 ## How this was built
 
-I signed off the preregistrations before their campaigns ran (D-0062, D-0079). My dispositions are in the decision log, including the decision to sustain a campaign abort (D-0079). Every campaign cited in the report ran on the dedicated bench host, with the D-0055 controls checked and recorded for each batch. Scripts generate the report tables from pinned git objects; the numbers are not entered by hand.
+I signed off the preregistrations before their campaigns ran (D-0062, D-0079). My dispositions are in the decision log, including the decision to sustain a campaign abort (D-0079). Every campaign cited here ran on the dedicated bench host, with the D-0055 controls checked and recorded for each batch. Scripts generate the exhibit tables from pinned git objects; the numbers are not entered by hand.
 
 ## License
 
